@@ -1,0 +1,29 @@
+[package]
+name = "asciidoc-slides"
+version = "0.1.0"
+description = "AsciiDoc slide deck editor with PPTX and PDF publishing"
+authors = ["yeongjun Kim"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix keeps the lib name distinct from the bin name (cargo#8519).
+name = "asciidoc_slides_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+typst-as-lib = { version = "=0.16.0", default-features = false, features = ["typst-kit-fonts", "typst-kit-embed-fonts"] }
+typst-pdf = "=0.15.1"
+typst = "=0.15.1"
+typst-layout = "=0.15.1"
+mitex = "=0.2.4"
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }

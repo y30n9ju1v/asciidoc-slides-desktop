@@ -1,0 +1,113 @@
+= AsciiDoc Slides: 텍스트로 만드는 발표 자료
+홍길동
+:revdate: 2026-10-03
+:slide-theme: light
+:slide-style: classic
+
+AsciiDoc으로 쓰고, PPTX와 PDF로 출판합니다.
+
+[.notes]
+--
+청중에게 인사하고 오늘 다룰 내용을 소개합니다.
+--
+
+== 슬라이드 만드는 법
+
+* `==` 제목 하나가 슬라이드 한 장
+* `===` 하위 제목도 별도의 슬라이드
+* 문서 제목(`=`)은 표지 슬라이드가 됩니다
+** 작성자와 `:revdate:` 가 함께 표시됩니다
+* `<<<` 로 같은 제목의 다음 슬라이드로 이어 쓰기
+
+[.notes]
+--
+발표자 노트는 슬라이드에는 보이지 않고, PPTX의 노트 영역으로 내보내집니다.
+--
+
+[.section]
+== 1부: 콘텐츠
+
+== 텍스트 서식
+
+*굵게*, _기울임_, `코드`, #강조#, H~2~O, E=mc^2^ 를 지원합니다.
+
+링크도 그대로 동작합니다: https://asciidoc.org[AsciiDoc 공식 사이트]
+
+[quote, Antoine de Saint-Exupéry]
+____
+완벽함이란 더할 것이 없을 때가 아니라, 뺄 것이 없을 때 완성된다.
+____
+
+== 코드와 표
+
+[source,rust]
+----
+fn main() {
+    println!("Hello, slides!");
+}
+----
+
+[.small.center,width=70%,cols="2,1,1"]
+|===
+| 형식 | 편집 가능 | 발표자 노트
+
+| PPTX | 예 | 예
+| PDF | 아니오 | 아니오
+|===
+
+== 두 단 레이아웃
+
+[columns]
+--
+* 텍스트와 목록
+* 짧은 설명
+
+image::images/chart.svg[분기별 매출]
+--
+
+== 이미지
+
+.분기별 매출 추이
+image::images/chart.svg[분기별 매출 차트]
+
+== 다이어그램과 수식
+
+[source,mermaid]
+----
+graph LR
+    A[AsciiDoc] --> B[SlideDeck]
+    B --> C[PPTX]
+    B --> D[PDF]
+----
+
+[stem]
+++++
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+++++
+
+== 블록 크기 조절
+
+블록 위에 역할과 속성을 붙여 크기를 정합니다.
+
+[source,asciidoc,font-size=80%]
+----
+[.small,width=60%]      // 글자 80%, 너비 60%
+[.large.center]         // 글자 120%, 가운데 정렬
+[source,python,font-size=70%]
+----
+
+== 알림 블록
+
+NOTE: 슬라이드 내용이 넘치면 글자 크기가 자동으로 줄어듭니다.
+
+TIP: 미리보기에서 슬라이드를 클릭하면 해당 소스 위치로 이동합니다.
+
+WARNING: 원격 이미지는 내보내기에 포함되지 않습니다. 이미지 파일은 문서 옆에 두세요.
+
+[%notitle]
+== 감사합니다
+
+[.lead]
+감사합니다!
+
+질문이 있으신가요?

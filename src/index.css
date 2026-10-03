@@ -1,0 +1,671 @@
+/* Tailwind must be the very first statement in the stylesheet - everything
+   else (this app's own CSS variables and rules) comes after. */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'katex/dist/katex.min.css';
+
+/* Obsidian-inspired neutral surfaces with violet interactive states. */
+:root,
+[data-color-mode='dark'] {
+  --bg-app: #1e1e1e;
+  --bg-header: #181818;
+  --bg-explorer: #161616;
+  --bg-preview: #1e1e1e;
+  --bg-button: #262626;
+  --bg-button-hover: #2f2f2f;
+  --bg-button-primary: #36322e;
+  --bg-file-indicator: #1c1c1c;
+  --border-color: #2a2a2a;
+  --text-main: #dcddde;
+  --text-muted: #9a9a9a;
+  --text-subtle: #6e6e6e;
+  --color-brand: #8875ff;
+  /* Named --app-accent rather than the more obvious --color-accent: shadcn/
+     Tailwind's own "accent" semantic token (see the @theme inline block
+     below) resolves to a literal `--color-accent` custom property too, and
+     since CSS custom properties aren't namespaced, that would silently
+     clobber this one (or vice versa) by cascade order alone. */
+  --app-accent: #b389f9;
+  --color-warning: #e0af68;
+  --item-hover-bg: rgb(255 255 255 / 6%);
+  --item-active-bg: rgb(136 117 255 / 16%);
+
+  /* shadcn/ui semantic tokens - values borrowed from this app's own palette
+     above so shadcn components (Button, Select, Tabs, Dialog, ...) blend
+     into the existing dark editor look instead of shadcn's stock zinc/slate
+     defaults. Bare (unprefixed) names, same convention shadcn itself uses -
+     the @theme inline block below is what turns these into the `--color-*`
+     custom properties Tailwind's bg-primary/text-foreground/etc. utilities
+     actually read. */
+  --radius: 0.5rem;
+  --background: var(--bg-app);
+  --foreground: var(--text-main);
+  --card: var(--bg-header);
+  --card-foreground: var(--text-main);
+  --popover: var(--bg-header);
+  --popover-foreground: var(--text-main);
+  /* A deeper fill preserves white-text contrast; the lighter brand is for accents. */
+  --primary: #6d54e8;
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-button);
+  --secondary-foreground: var(--text-main);
+  --muted: var(--bg-explorer);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--item-hover-bg);
+  --accent-foreground: var(--text-main);
+  --destructive: #e06c75;
+  --destructive-foreground: #ffffff;
+  --border: var(--border-color);
+  --input: var(--border-color);
+  --ring: var(--color-brand);
+}
+
+[data-color-mode='light'] {
+  --bg-app: #ffffff;
+  --bg-header: #f6f6f7;
+  --bg-explorer: #f2f3f5;
+  --bg-preview: #ffffff;
+  --bg-button: #ececee;
+  --bg-button-hover: #e3e3e6;
+  --bg-button-primary: #ece7fd;
+  --bg-file-indicator: #f2f3f5;
+  --border-color: #e3e3e6;
+  --text-main: #202020;
+  --text-muted: #6c6c6c;
+  --text-subtle: #8a8a8a;
+  --color-brand: #6d28d9;
+  --app-accent: #9333ea;
+  --color-warning: #9a6700;
+  --item-hover-bg: rgb(0 0 0 / 4.5%);
+  --item-active-bg: rgb(109 40 217 / 10%);
+
+  /* This darker light-mode brand already supports white text. */
+  --primary: var(--color-brand);
+  --primary-foreground: #ffffff;
+  --destructive: #cf222e;
+}
+
+/* Maps the semantic tokens above into the `--color-*`/`--radius-*` custom
+   properties Tailwind's utility classes (bg-background, text-foreground,
+   bg-primary, rounded-lg, ...) actually reference - see any shadcn/ui
+   Tailwind v4 setup for this exact pattern. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Wrapped in Tailwind's own `base` layer (declared by `@import "tailwindcss"`
+   above) rather than left unlayered: per the CSS cascade-layers spec, an
+   unlayered rule always beats *any* layered rule regardless of selector
+   specificity or source order - so this reset was silently winning against
+   every Tailwind spacing utility (`.px-3`, `.py-1.5`, `.gap-1.5`, ...) added
+   once shadcn/ui components started using them, since Tailwind's own
+   utilities live in the later `utilities` layer. Wrapping this in `base`
+   puts it in the same priority tier Tailwind's own Preflight reset uses,
+   so `utilities` (declared after `base`) correctly wins again. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* ---------- App shell ---------- */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pane-explorer {
+  flex-shrink: 0;
+  width: 220px;
+  height: 100%;
+  overflow: hidden;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-explorer);
+}
+
+.pane-editor {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane-preview {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  background: var(--bg-explorer);
+}
+
+.pane-resizer {
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: var(--border-color);
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.pane-resizer:hover::before,
+.pane-resizer:active::before,
+.pane-resizer:focus-visible::before {
+  background: var(--color-brand);
+  transform: scaleX(1.5);
+}
+
+.pane-resizer:focus-visible {
+  outline: none;
+}
+
+.pane-loading {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.vim-status-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  height: 22px;
+  padding: 0 10px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-button);
+  color: var(--text-muted);
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+/* ---------- Slide stage ---------- */
+.slide-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.slide-frame > .slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+
+.filmstrip-item {
+  display: block;
+  padding: 0;
+  flex-shrink: 0;
+  width: 168px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  background: none;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+  transition: border-color 0.15s ease;
+}
+
+.filmstrip-item:hover {
+  border-color: var(--border-color);
+}
+
+.filmstrip-item[aria-current='true'] {
+  border-color: var(--color-brand);
+}
+
+.filmstrip-item:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* ---------- Slide content (logical 1280x720 px canvas) ---------- */
+.slide {
+  --slide-bg: var(--theme-bg);
+  --slide-text: var(--theme-text);
+  --slide-muted: var(--theme-muted);
+  --slide-accent: var(--theme-accent);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--slide-bg);
+  color: var(--slide-text);
+  font-family:
+    'Noto Sans KR',
+    'Apple SD Gothic Neo',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-size: var(--slide-body-size);
+  line-height: 1.35;
+  overflow: hidden;
+  user-select: none;
+  /* Thumbnails live inside <button>s; reset what buttons would otherwise
+     pass down so every slide renders identically at every size. */
+  text-align: left;
+  letter-spacing: normal;
+  white-space: normal;
+  font-weight: 400;
+  font-style: normal;
+  text-transform: none;
+}
+
+.slide-content {
+  padding: 43px 58px 53px;
+}
+
+.slide-hero {
+  justify-content: center;
+  padding: 77px 86px;
+}
+
+.slide-hero[data-hero-fill='true'] {
+  background: var(--slide-hero-bg);
+  color: var(--slide-hero-text);
+  --slide-text: var(--slide-hero-text);
+  --slide-muted: var(--slide-hero-text);
+  --slide-accent: var(--slide-hero-text);
+}
+
+.slide-hero[data-hero-align='center'] {
+  align-items: center;
+  text-align: center;
+}
+
+.slide[data-font='serif'] {
+  font-family: 'Noto Serif KR', 'AppleMyungjo', 'Nanum Myeongjo', Georgia, serif;
+}
+
+/* Content-slide title decorations (SlideStyle.titleDecoration). */
+.slide-content[data-title='underline'] .slide-title::after {
+  content: '';
+  display: block;
+  width: 96px;
+  height: 5px;
+  margin-top: 12px;
+  background: var(--slide-accent);
+}
+
+.slide-content[data-title='band'] .slide-title {
+  margin: -43px -58px 27px;
+  padding: 24px 58px;
+  background: var(--slide-hero-bg);
+  color: var(--slide-hero-text);
+}
+
+.slide-sized {
+  box-sizing: border-box;
+}
+
+.slide-title {
+  flex-shrink: 0;
+  margin-bottom: 27px;
+  color: var(--slide-accent);
+  font-size: var(--slide-title-size);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.slide-hero .slide-title {
+  margin-bottom: 0;
+}
+
+.slide-subtitle {
+  margin-top: 0.4em;
+  font-size: calc(var(--slide-body-size) * 1.2);
+}
+
+.slide-byline {
+  margin-top: 1.4em;
+  font-size: calc(var(--slide-body-size) * 0.8);
+  opacity: 0.9;
+}
+
+.slide-divider-bar {
+  width: 115px;
+  height: 7px;
+  margin-bottom: 0.5em;
+  background: var(--slide-accent);
+}
+
+.slide-body-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.slide-body {
+  transform-origin: top left;
+}
+
+.slide-hero .slide-body-area {
+  flex: 0 1 auto;
+  margin-top: 1em;
+}
+
+.slide-number {
+  position: absolute;
+  right: 34px;
+  bottom: 22px;
+  color: var(--slide-muted);
+  font-size: 15px;
+}
+
+.slide-body > * + * {
+  margin-top: 0.6em;
+}
+
+.slide-body p {
+  margin: 0;
+}
+
+.slide-body ul,
+.slide-body ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.slide-body ul > li::marker {
+  color: var(--slide-accent);
+}
+
+.slide-body li + li {
+  margin-top: 0.35em;
+}
+
+.slide-body li > ul,
+.slide-body li > ol {
+  margin-top: 0.35em;
+  font-size: 0.92em;
+}
+
+.slide-body a {
+  color: var(--slide-accent);
+  text-decoration: none;
+}
+
+.slide-body code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--slide-code-bg);
+  font-family: 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.slide-body mark {
+  background: #fff3a3;
+  color: inherit;
+}
+
+.slide-body pre {
+  margin: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--slide-code-bg);
+  color: var(--slide-code-text);
+  font-family: 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+  font-size: calc(var(--slide-code-ratio) * 1em);
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.slide-body pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.slide-caption {
+  color: var(--slide-muted);
+  font-size: 0.75em;
+  font-weight: 700;
+}
+
+.slide-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.slide-figure img,
+.slide-figure .slide-diagram svg {
+  display: block;
+  max-width: 100%;
+  max-height: 403px;
+  object-fit: contain;
+}
+
+.slide-figure figcaption {
+  margin-top: 0.3em;
+  color: var(--slide-muted);
+  font-size: 0.7em;
+}
+
+.slide-missing {
+  padding: 1em;
+  border: 1px dashed var(--slide-table-border);
+  border-radius: 4px;
+  color: var(--slide-muted);
+  font-size: 0.7em;
+  text-align: center;
+}
+
+.slide-body blockquote {
+  margin: 0;
+  padding: 6px 0 6px 16px;
+  border-left: 5px solid var(--slide-accent);
+  font-style: italic;
+}
+
+.slide-body blockquote footer {
+  margin-top: 0.4em;
+  color: var(--slide-muted);
+  font-size: 0.8em;
+  font-style: normal;
+}
+
+.slide-admonition {
+  padding: 10px 14px;
+  border-left: 5px solid var(--admonition-color);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--admonition-color) 10%, transparent);
+}
+
+.slide-admonition-label {
+  margin-right: 0.6em;
+  color: var(--admonition-color);
+  font-size: 0.7em;
+  font-weight: 700;
+}
+
+.slide-body table {
+  border-collapse: collapse;
+  font-size: 0.8em;
+}
+
+/* text-align positions text, not a table box. Align the intrinsic-width
+   table inside its sized block as well as positioning the block itself. */
+.slide-sized[data-align='center'] table {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.slide-sized[data-align='right'] table {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.slide-sized[data-align='left'] table {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.slide-body th,
+.slide-body td {
+  padding: 7px 10px;
+  border: 1px solid var(--slide-table-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.slide-body th {
+  background: var(--slide-table-header-bg);
+  color: var(--slide-table-header-text);
+}
+
+.slide-body hr {
+  border: none;
+  border-top: 1px solid var(--slide-table-border);
+}
+
+.slide-columns {
+  display: grid;
+  gap: 38px;
+}
+
+.slide-subheading {
+  font-size: 1.1em;
+  font-weight: 700;
+}
+
+.slide-dl dt {
+  font-weight: 700;
+}
+
+.slide-dl dd {
+  margin: 0 0 0.3em 1em;
+}
+
+.slide-math-block {
+  text-align: center;
+}
+
+/* ---------- Presenter ---------- */
+.presenter {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #000;
+  cursor: none;
+}
+
+.presenter:hover {
+  cursor: default;
+}
+
+.presenter-stage {
+  width: min(100vw, calc(100vh * 16 / 9));
+}
+
+/* highlight.js tokens, tuned per slide brightness */
+.slide .hljs-keyword,
+.slide .hljs-selector-tag,
+.slide .hljs-built_in {
+  color: #cf222e;
+}
+.slide .hljs-string,
+.slide .hljs-attr {
+  color: #0a3069;
+}
+.slide .hljs-title,
+.slide .hljs-function .hljs-title {
+  color: #8250df;
+}
+.slide .hljs-comment {
+  color: #6e7781;
+  font-style: italic;
+}
+.slide .hljs-number,
+.slide .hljs-literal {
+  color: #0550ae;
+}
+.slide[data-dark='true'] .hljs-keyword,
+.slide[data-dark='true'] .hljs-selector-tag,
+.slide[data-dark='true'] .hljs-built_in {
+  color: #ff7b72;
+}
+.slide[data-dark='true'] .hljs-string,
+.slide[data-dark='true'] .hljs-attr {
+  color: #a5d6ff;
+}
+.slide[data-dark='true'] .hljs-title,
+.slide[data-dark='true'] .hljs-function .hljs-title {
+  color: #d2a8ff;
+}
+.slide[data-dark='true'] .hljs-comment {
+  color: #8b949e;
+}
+.slide[data-dark='true'] .hljs-number,
+.slide[data-dark='true'] .hljs-literal {
+  color: #79c0ff;
+}

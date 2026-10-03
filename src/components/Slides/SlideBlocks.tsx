@@ -1,0 +1,376 @@
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import hljs from 'highlight.js/lib/common';
+import katex from 'katex';
+import type {
+  SafeAssetRef,
+  SafeBlock,
+  SafeInline,
+  SafeListItem,
+  SafeTableCell,
+} from '../../../packages/asciidoc-typst/typescript/src';
+import { imageCacheRevision, loadImageResult, subscribeImages } from '../../services/imageStore';
+import { renderMermaidSvg } from '../../services/mermaidRenderer';
+import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from '../../services/safeDispatch';
+import type { BlockLayout } from '../../services/slideDeck';
+import { useSlideAssets } from './SlideAssetsContext';
+
+/**
+ * Renders SafeDocument blocks as React elements. Text is always React text
+ * (escaped); the only HTML strings injected come from highlight.js (which
+ * escapes its input), KaTeX with `trust: false`, and Mermaid in strict mode.
+ */
+
+const SAFE_LINK_RE = /^(https?:\/\/|mailto:)/i;
+
+const ADMONITION_COLORS: Record<string, string> = {
+  note: '#2563eb',
+  tip: '#16a34a',
+  important: '#7c3aed',
+  warning: '#d97706',
+  caution: '#dc2626',
+};
+
+interface ObjectUrlState {
+  url: string | null;
+  error: string | null;
+  loading: boolean;
+}
+
+function useObjectUrl(asset: SafeAssetRef): ObjectUrlState {
+  const revision = useSyncExternalStore(subscribeImages, imageCacheRevision);
+  const { documentDir } = useSlideAssets();
+  const relativePath = asset.kind === 'document-relative' ? asset.relativePath : null;
+  const [state, setState] = useState<{ key: string; url: string | null; error: string | null } | null>(null);
+  const key = `${revision}\u0000${documentDir}\u0000${relativePath}`;
+
+  useEffect(() => {
+    if (!relativePath) return;
+    let cancelled = false;
+    let url: string | null = null;
+    void loadImageResult(documentDir, relativePath).then((result) => {
+      if (cancelled) return;
+      url = result.blob ? URL.createObjectURL(result.blob) : null;
+      setState({ key, url, error: result.error });
+    });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [documentDir, relativePath, key]);
+
+  if (!relativePath) return { url: null, error: 'remote images are not embedded', loading: false };
+  return state?.key === key
+    ? { url: state.url, error: state.error, loading: false }
+    : { url: null, error: null, loading: true };
+}
+
+function MissingImage({ alt, reason }: { alt: string; reason: string | null }) {
+  return (
+    <div className="slide-missing">
+      Image not shown: {alt}
+      {reason && <div style={{ fontSize: '0.8em', marginTop: 4 }}>{reason}</div>}
+    </div>
+  );
+}
+
+function SlideImage({ asset, alt, caption }: { asset: SafeAssetRef; alt: string; caption: string | null }) {
+  const { url, error, loading } = useObjectUrl(asset);
+  if (loading) return <div className="slide-figure" style={{ minHeight: 120 }} />;
+  return (
+    <figure className="slide-figure">
+      {url ? <img src={url} alt={alt} draggable={false} /> : <MissingImage alt={alt} reason={error} />}
+      {caption && <figcaption>{caption}</figcaption>}
+    </figure>
+  );
+}
+
+function InlineImage({ asset, alt }: { asset: SafeAssetRef; alt: string }) {
+  const { url } = useObjectUrl(asset);
+  return url ? (
+    <img src={url} alt={alt} style={{ display: 'inline', height: '1em', verticalAlign: '-0.15em' }} />
+  ) : (
+    <>{alt}</>
+  );
+}
+
+function Diagram({ code }: { code: string }) {
+  const { theme } = useSlideAssets();
+  const [svg, setSvg] = useState<{ code: string; svg: string | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void renderMermaidSvg(code, theme).then((result) => {
+      if (!cancelled) setSvg({ code, svg: result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [code, theme]);
+  if (svg?.code === code && svg.svg) {
+    return (
+      <figure className="slide-figure">
+        <div className="slide-diagram" dangerouslySetInnerHTML={{ __html: svg.svg }} />
+      </figure>
+    );
+  }
+  return (
+    <pre>
+      <code>{code}</code>
+    </pre>
+  );
+}
+
+function CodeBlock({ code, language }: { code: string; language: string | null }) {
+  const html = useMemo(() => {
+    if (!language || !hljs.getLanguage(language)) return null;
+    try {
+      return hljs.highlight(code, { language, ignoreIllegals: true }).value;
+    } catch {
+      return null;
+    }
+  }, [code, language]);
+  return <pre className="hljs">{html ? <code dangerouslySetInnerHTML={{ __html: html }} /> : <code>{code}</code>}</pre>;
+}
+
+function MathView({ tex, display }: { tex: string; display: boolean }) {
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(tex, { displayMode: display, throwOnError: false, trust: false, output: 'html' });
+    } catch {
+      return null;
+    }
+  }, [tex, display]);
+  if (!html) return <code>{tex}</code>;
+  return display ? (
+    <div className="slide-math-block" dangerouslySetInnerHTML={{ __html: html }} />
+  ) : (
+    <span dangerouslySetInnerHTML={{ __html: html }} />
+  );
+}
+
+export function Inlines({ inlines }: { inlines: SafeInline[] }) {
+  return (
+    <>
+      {inlines.map((inline, index) => (
+        <Inline key={index} inline={inline} />
+      ))}
+    </>
+  );
+}
+
+function Inline({ inline }: { inline: SafeInline }) {
+  return dispatchInline(INLINE_VIEWS, inline, undefined);
+}
+
+const wrap =
+  (Tag: 'strong' | 'em' | 'sup' | 'sub' | 'mark') =>
+  (inline: { children: SafeInline[] }): ReactNode => (
+    <Tag>
+      <Inlines inlines={inline.children} />
+    </Tag>
+  );
+
+const noteView = (inline: { children: SafeInline[] }): ReactNode => (
+  <span style={{ color: 'var(--slide-muted)', fontSize: '0.7em' }}>
+    {' ('}
+    <Inlines inlines={inline.children} />)
+  </span>
+);
+
+const INLINE_VIEWS: InlineHandlers<ReactNode> = {
+  text: (inline) => inline.value,
+  strong: wrap('strong'),
+  emphasis: wrap('em'),
+  superscript: wrap('sup'),
+  subscript: wrap('sub'),
+  mark: wrap('mark'),
+  code: (inline) => <code>{inline.value}</code>,
+  math: (inline) => <MathView tex={inline.tex} display={false} />,
+  link: (inline) => {
+    const children = inline.children.length ? <Inlines inlines={inline.children} /> : inline.target;
+    // Links never navigate the app window; they are styled text here and
+    // become real hyperlinks in PPTX/PDF.
+    return SAFE_LINK_RE.test(inline.target) ? <a title={inline.target}>{children}</a> : <>{children}</>;
+  },
+  footnote: noteView,
+  endnote: noteView,
+  inlineImage: (inline) => <InlineImage asset={inline.asset} alt={inline.alt} />,
+  citation: (inline) => `[${inline.key}]`,
+};
+
+function ListItems({ items }: { items: SafeListItem[] }) {
+  return items.map((item, index) => (
+    <li key={index}>
+      {item.checked === true ? '☑ ' : item.checked === false ? '☐ ' : null}
+      <Inlines inlines={item.inlines} />
+      {item.blocks.length > 0 && <Blocks blocks={item.blocks} />}
+    </li>
+  ));
+}
+
+function TableBlock({ rows, hasHeader }: { rows: SafeTableCell[][]; hasHeader: boolean }) {
+  const columns = Math.max(0, ...rows.map((row) => row.length));
+  const [head, body] = hasHeader ? [rows.slice(0, 1), rows.slice(1)] : [[], rows];
+  const cells = (row: SafeTableCell[], Tag: 'th' | 'td') =>
+    Array.from({ length: columns }, (_, index) => (
+      <Tag key={index}>{row[index] ? <Inlines inlines={row[index].inlines} /> : null}</Tag>
+    ));
+  return (
+    <table>
+      {head.length > 0 && (
+        <thead>
+          {head.map((row, index) => (
+            <tr key={index}>{cells(row, 'th')}</tr>
+          ))}
+        </thead>
+      )}
+      <tbody>
+        {body.map((row, index) => (
+          <tr key={index}>{cells(row, 'td')}</tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function splitIntoColumns(blocks: SafeBlock[], count: number): SafeBlock[][] {
+  if (blocks.length === 0) return Array.from({ length: count }, () => []);
+  const size = Math.ceil(blocks.length / count);
+  return Array.from({ length: count }, (_, index) => blocks.slice(index * size, (index + 1) * size));
+}
+
+function Caption({ text }: { text: string | null | undefined }) {
+  return text ? <div className="slide-caption">{text}</div> : null;
+}
+
+function Block({ block }: { block: SafeBlock }) {
+  return dispatchBlock(BLOCK_VIEWS, block, undefined);
+}
+
+const titledContainer = (block: { title: string | null; blocks: SafeBlock[] }): ReactNode => (
+  <div>
+    {block.title && <strong>{block.title}</strong>}
+    <Blocks blocks={block.blocks} />
+  </div>
+);
+
+const BLOCK_VIEWS: BlockHandlers<ReactNode> = {
+  paragraph: (block) => (
+    <p>
+      <Inlines inlines={block.inlines} />
+    </p>
+  ),
+  section: (block) => (
+    <div>
+      <div className="slide-subheading">{block.title}</div>
+      <Blocks blocks={block.blocks} />
+    </div>
+  ),
+  container: titledContainer,
+  formal: titledContainer,
+  documentPart: titledContainer,
+  columns: (block) => (
+    <div className="slide-columns" style={{ gridTemplateColumns: `repeat(${block.count}, minmax(0, 1fr))` }}>
+      {splitIntoColumns(block.blocks, block.count).map((group, index) => (
+        <div key={index}>
+          <Blocks blocks={group} />
+        </div>
+      ))}
+    </div>
+  ),
+  code: (block) => (
+    <div>
+      <Caption text={block.caption} />
+      <CodeBlock code={block.code} language={block.language} />
+    </div>
+  ),
+  diagram: (block) => <Diagram code={block.code} />,
+  mathBlock: (block) => <MathView tex={block.tex} display />,
+  image: (block) => <SlideImage asset={block.asset} alt={block.alt} caption={block.caption} />,
+  list: (block) => {
+    const Tag = block.ordered ? 'ol' : 'ul';
+    return (
+      <Tag>
+        <ListItems items={block.items} />
+      </Tag>
+    );
+  },
+  descriptionList: (block) => (
+    <dl className="slide-dl">
+      {block.items.map((item, index) => (
+        <div key={index}>
+          <dt>
+            <Inlines inlines={item.termInlines} />
+          </dt>
+          <dd>
+            <Inlines inlines={item.descriptionInlines} />
+            {item.descriptionBlocks.length > 0 && <Blocks blocks={item.descriptionBlocks} />}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  ),
+  quote: (block) => {
+    const source = [block.attribution, block.citation].filter(Boolean).join(', ');
+    return (
+      <blockquote>
+        <Inlines inlines={block.inlines} />
+        {source && <footer>— {source}</footer>}
+      </blockquote>
+    );
+  },
+  admonition: (block) => (
+    <div
+      className="slide-admonition"
+      style={{ '--admonition-color': ADMONITION_COLORS[block.kind] ?? ADMONITION_COLORS.note } as CSSProperties}
+    >
+      <span className="slide-admonition-label">{block.kind.toUpperCase()}</span>
+      <Inlines inlines={block.inlines} />
+    </div>
+  ),
+  table: (block) => (
+    <div>
+      <Caption text={block.caption} />
+      <TableBlock rows={block.rows} hasHeader={block.hasHeader} />
+    </div>
+  ),
+  thematicBreak: () => <hr />,
+  pageBreak: () => null,
+};
+
+function layoutStyle(layout: BlockLayout): CSSProperties {
+  return {
+    width: layout.width ? `${layout.width * 100}%` : undefined,
+    fontSize: layout.scale ? `${layout.scale}em` : undefined,
+    marginLeft: layout.align === 'center' || layout.align === 'right' ? 'auto' : undefined,
+    marginRight: layout.align === 'center' ? 'auto' : undefined,
+    textAlign: layout.align ?? undefined,
+  };
+}
+
+/** A slide's top-level blocks, each wrapped in its author-set sizing. */
+export function SlideBlocks({ blocks, layouts }: { blocks: SafeBlock[]; layouts: (BlockLayout | null)[] }) {
+  return (
+    <>
+      {blocks.map((block, index) => {
+        const layout = layouts[index];
+        return layout ? (
+          <div key={index} className="slide-sized" data-align={layout.align ?? undefined} style={layoutStyle(layout)}>
+            <Block block={block} />
+          </div>
+        ) : (
+          <Block key={index} block={block} />
+        );
+      })}
+    </>
+  );
+}
+
+export function Blocks({ blocks }: { blocks: SafeBlock[] }) {
+  return (
+    <>
+      {blocks.map((block, index) => (
+        <Block key={index} block={block} />
+      ))}
+    </>
+  );
+}
