@@ -62,7 +62,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={label} onClick={onClick}>
+        <Button className="text-muted-foreground" variant="ghost" size="icon" aria-label={label} onClick={onClick}>
           {children}
         </Button>
       </TooltipTrigger>
@@ -108,7 +108,7 @@ export function AppHeader(props: AppHeaderProps) {
 
       <div className="mx-2 flex min-w-0 items-center gap-1.5 text-sm text-[var(--text-muted)]">
         <FileText className="size-3.5 shrink-0" />
-        <span className="truncate" title={fileName}>
+        <span className="truncate font-medium text-foreground" title={fileName}>
           {fileName}
         </span>
         {isDirty && (
@@ -118,7 +118,7 @@ export function AppHeader(props: AppHeaderProps) {
             title="Unsaved changes"
           />
         )}
-        <span className="ml-1 shrink-0 text-xs text-[var(--text-subtle)]">
+        <span className="ml-1 shrink-0 rounded-md bg-[var(--item-hover-bg)] px-1.5 py-0.5 text-xs text-muted-foreground">
           {slideCount} {slideCount === 1 ? 'slide' : 'slides'}
         </span>
       </div>
@@ -166,7 +166,7 @@ export function AppHeader(props: AppHeaderProps) {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button size="sm" onClick={props.onPresent} disabled={!props.canPresent}>
+            <Button className="header-present" size="sm" onClick={props.onPresent} disabled={!props.canPresent}>
               <Play />
               Present
             </Button>

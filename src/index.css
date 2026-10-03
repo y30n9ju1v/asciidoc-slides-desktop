@@ -85,6 +85,38 @@
   --destructive: #cf222e;
 }
 
+/* Polish the existing single-row toolbar without changing its layout. */
+.app-header {
+  flex-wrap: nowrap;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 3%);
+}
+
+.app-header [data-slot='button'],
+.app-header [data-slot='select-trigger'] {
+  border-radius: 8px;
+}
+
+.app-header [data-slot='button']:hover:not(:disabled) {
+  color: var(--text-main);
+}
+
+.app-header [data-slot='select-trigger'] {
+  background: var(--bg-app);
+  box-shadow: none;
+}
+
+.app-header [data-slot='select-trigger']:hover {
+  border-color: var(--text-subtle);
+}
+
+.app-header .header-present {
+  box-shadow: 0 2px 4px var(--item-active-bg);
+}
+
+.app-header .header-present:hover:not(:disabled) {
+  color: var(--primary-foreground);
+}
+
 /* Maps the semantic tokens above into the `--color-*`/`--radius-*` custom
    properties Tailwind's utility classes (bg-background, text-foreground,
    bg-primary, rounded-lg, ...) actually reference - see any shadcn/ui
