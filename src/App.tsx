@@ -163,6 +163,8 @@ export default function App() {
   return (
     <div className="app-container">
       <AppHeader
+        fontFamily={deck?.fontFamily}
+        onFontFamilyChange={(font) => setHeaderAttribute('slide-font', font)}
         fileName={fileName}
         isDirty={document_.isDirty}
         slideCount={summary.slideCount}

@@ -310,6 +310,7 @@ export async function parseSlideDeck(source: string): Promise<SlideDeck> {
     metadata,
     theme: slideThemeById(header.getAttribute(SLIDE_THEME_ATTRIBUTE)),
     style: slideStyleById(header.getAttribute(SLIDE_STYLE_ATTRIBUTE)),
+    fontFamily: String(header.getAttribute('slide-font') ?? '').trim() || undefined,
     slides: builder.slides,
     diagnostics: builder.diagnostics,
   };

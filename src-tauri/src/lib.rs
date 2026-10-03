@@ -8,8 +8,6 @@ mod safe_document;
 mod slide_compiler;
 mod slide_deck;
 mod slide_writer;
-#[path = "../../packages/asciidoc-typst/rust/src/typst_font.rs"]
-#[allow(dead_code)]
 mod typst_font;
 
 /// Emitted when a deck arrives while the app is running (macOS "Open With").
@@ -30,6 +28,7 @@ pub fn run() {
             fs_scope_commands::choose_document_save_path,
             fs_scope_commands::choose_export_file,
             slide_compiler::export_slides_pdf,
+            typst_font::list_system_fonts,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

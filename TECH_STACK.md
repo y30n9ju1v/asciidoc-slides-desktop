@@ -43,6 +43,6 @@ Monaco 원문 → parseSlideDeck → SlideDeck (SafeBlock + 슬라이드별 데�
 - Tauri capability, 런타임 경로 스코프, 문서 상대 경로 검증은 서로 대체하지 않는 방어 계층이다.
 - 로컬 동영상은 asset 프로토콜, 유튜브는 발표 중 명시적인 재생 조작 후 제한된 iframe으로 표시한다. 편집 미리보기는 유튜브에 접속하지 않는다.
 - 공유 모델·Rust 요청에는 HTML·DOM·완성된 Typst 소스를 넣지 않는다. 세부 계약은 [SAFE_DOCUMENT_SPEC.md](./SAFE_DOCUMENT_SPEC.md)를 따른다.
-- 번들 폰트와 외부 라이브러리 고지는 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md), [폰트 고지](./src-tauri/assets/fonts/THIRD_PARTY_NOTICES.md)를 유지한다. 배포 전 실제 산출물 기준으로 다시 확인한다.
+- PDF는 시스템 폰트만 검색한다. 폰트 선택은 `:slide-font:`에 저장되며 세 출력기에 전달된다. Noto·Typst 폰트 번들은 사용하지 않는다. KaTeX 전용 웹폰트와 외부 라이브러리 고지는 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md), [폰트 고지](./src-tauri/assets/fonts/THIRD_PARTY_NOTICES.md)를 참고하고 실제 배포 산출물 기준으로 확인한다.
 
 Vault·Book Project·SQLite 검색·HTML/EPUB 출판·iOS는 이 문서의 지원 기능이 아니다.

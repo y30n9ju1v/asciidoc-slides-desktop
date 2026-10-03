@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { EditorTextSizeControl } from './EditorTextSizeControl';
+import { SlideFontControl } from './SlideFontControl';
 import { MAX_EDITOR_FONT_SIZE, MIN_EDITOR_FONT_SIZE } from '../../services/editorPreferences';
 import {
   Download,
@@ -30,6 +31,8 @@ import { SLIDE_STYLES, type SlideStyleId } from '../../services/slideStyles';
 import { SLIDE_THEMES, type SlideThemeId } from '../../services/slideThemes';
 
 interface AppHeaderProps {
+  fontFamily?: string;
+  onFontFamilyChange: (font: string) => void;
   fileName: string;
   isDirty: boolean;
   slideCount: number;
@@ -125,6 +128,7 @@ export function AppHeader(props: AppHeaderProps) {
 
       <div className="ml-auto flex items-center gap-1">
         <EditorTextSizeControl fontSize={props.editorFontSize} onChange={props.onEditorFontSizeChange} />
+        <SlideFontControl value={props.fontFamily} onChange={props.onFontFamilyChange} />
         <Select value={styleId} onValueChange={(value) => props.onStyleChange(value as SlideStyleId)}>
           <SelectTrigger className="h-8 w-[112px]" aria-label="Slide style">
             <SelectValue />

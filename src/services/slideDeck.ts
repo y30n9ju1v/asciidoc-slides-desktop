@@ -84,6 +84,8 @@ export interface SlideDeckMetadata {
 
 export interface SlideDeck {
   version: typeof SLIDE_DECK_VERSION;
+  /** Installed family selected by the author; omitted uses the style's system defaults. */
+  fontFamily?: string;
   metadata: SlideDeckMetadata;
   theme: SlideTheme;
   style: SlideStyle;

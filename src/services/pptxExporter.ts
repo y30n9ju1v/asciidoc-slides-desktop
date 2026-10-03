@@ -17,7 +17,7 @@ import type { SlideTheme } from './slideThemes';
 type PptxSlide = PptxGenJS.Slide;
 type TextProps = PptxGenJS.TextProps;
 
-const FONT_FACES = { sans: 'Noto Sans KR', serif: 'Noto Serif KR' } as const;
+const FONT_FACES = { sans: 'Apple SD Gothic Neo', serif: 'AppleMyungjo' } as const;
 const MONO_FACE = 'Consolas';
 const MARGIN_X = 0.6;
 const CONTENT_W = SLIDE_WIDTH_IN - MARGIN_X * 2;
@@ -447,7 +447,7 @@ export async function buildPptx(deck: SlideDeck, documentDir: string | null): Pr
   pptx.title = deck.metadata.title;
   pptx.author = deck.metadata.author;
   pptx.subject = deck.metadata.subtitle;
-  const fontFace = FONT_FACES[deck.style.font];
+  const fontFace = deck.fontFamily || FONT_FACES[deck.style.font];
   pptx.theme = { headFontFace: fontFace, bodyFontFace: fontFace };
   const context: ExportContext = {
     theme: deck.theme,

@@ -1,5 +1,13 @@
 # AsciiDoc Slides
 
+## 시스템 폰트
+
+상단의 **Slide font (Aa)** 버튼에서 설치된 폰트를 검색·선택합니다. 선택은 원문의 `:slide-font: 폰트 이름`에 저장되고 미리보기·PPTX·PDF에 적용됩니다. 기본값은 스타일에 맞는 시스템 고딕·명조이며, 코드·수식은 별도의 시스템 폰트를 사용합니다.
+
+PDF용 Noto 및 Typst 기본 폰트는 번들하거나 다운로드하지 않습니다. 다른 컴퓨터에서는 글꼴·줄바꿈이 달라질 수 있고, 한글·특수문자 지원 여부는 미리보기와 출력에서 확인해야 합니다. 선택한 폰트가 없으면 PDF 출력을 중단합니다. 수식 PDF에는 설치된 OpenType 수학 폰트(예: STIX Two Math, Cambria Math)가 필요합니다. PPTX 수신자에게도 해당 폰트가 필요할 수 있습니다. 시스템 폰트의 PDF 임베딩 권한은 해당 폰트의 라이선스를 따릅니다.
+
+KaTeX 수식 미리보기의 전용 웹폰트와 Typst 의존성 내부의 PDF 표준 폰트 자산은 별개로 남습니다. 따라서 이 변경은 앱의 모든 폰트 자산을 없애는 변경이 아니라 슬라이드 텍스트 조판을 시스템 폰트로 전환하는 변경입니다.
+
 AsciiDoc으로 발표 자료를 쓰고 **PowerPoint(.pptx)** 와 **PDF** 로 출판하는 데스크톱 앱입니다.
 Tauri v2 + React + Monaco Editor + Asciidoctor.js 기반이며, [AsciiDoc Studio](../asciidoc-pages-desktop)와
 같은 스택과 `packages/asciidoc-typst` 서브모듈(SafeDocument 파이프라인)을 공유합니다.

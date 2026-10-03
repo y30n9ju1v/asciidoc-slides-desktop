@@ -6,6 +6,7 @@ Pages의 동명 안내처럼 공통 명세를 복제하지 않고 [공유 SafeDo
 
 - TypeScript 기준: [slideDeck.ts](./src/services/slideDeck.ts).
 - Rust 대응 모델: [slide_deck.rs](./src-tauri/src/slide_deck.rs).
+- 선택적 `fontFamily`는 `:slide-font:`의 설치 폰트 이름이다. 생략하면 시스템 기본값을 사용한다. PDF는 설치 여부를 확인하며 Typst 문자열로 이스케이프한다. 기존 v1 문서는 이 필드 없이도 읽을 수 있다.
 - 슬라이드 본문은 공유 `SafeBlock[]`이고, `blockLayouts`가 같은 인덱스의 크기·정렬을 정의한다.
 - 동영상은 공유 블록에 임의 타입을 넣지 않고 `SlideVideo[]`로 보관한다. `at`은 본문 블록 앞의 위치이며 마지막 위치는 본문 뒤다. 순서 처리는 `src/services/slideItems.ts`와 Rust 출력기를 함께 확인한다.
 - 문서의 진단·메타데이터·테마·스타일과 슬라이드의 제목·노트·원문 줄 번호는 데이터로 전달한다. DOM, 파일 핸들, 실행 가능한 소스를 추가하지 않는다.

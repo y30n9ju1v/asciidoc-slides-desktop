@@ -36,6 +36,13 @@ Only body.
 `;
 
 describe('parseSlideDeck', () => {
+  it('reads an optional system font and permits reverting to the default', async () => {
+    expect((await parseSlideDeck('= Deck\n:slide-font: Apple SD Gothic Neo\n\n== Body\nText')).fontFamily).toBe(
+      'Apple SD Gothic Neo',
+    );
+    expect((await parseSlideDeck('= Deck\n:slide-font:\n\n== Body\nText')).fontFamily).toBeUndefined();
+    expect((await parseSlideDeck(DECK)).fontFamily).toBeUndefined();
+  });
   it('builds title, section, content, continuation and child slides', async () => {
     const deck = await parseSlideDeck(DECK);
     expect(deck.metadata).toMatchObject({

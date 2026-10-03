@@ -48,6 +48,11 @@ async function unzipText(bytes: Uint8Array): Promise<Map<string, string>> {
 }
 
 describe('buildPptx', () => {
+  it('writes the selected installed font name into the PowerPoint output', async () => {
+    const deck = await parseSlideDeck('= Font test\n:slide-font: Menlo\n\n== Body\nExample');
+    const files = await unzipText(await buildPptx(deck, null));
+    expect(files.get('ppt/slides/slide2.xml')).toContain('typeface="Menlo"');
+  });
   it('rejects unresolved images and posters rather than exporting placeholders', async () => {
     for (const content of ['image::missing.png[Missing]', 'video::dQw4w9WgXcQ[youtube,cover=missing.png]']) {
       const deck = await parseSlideDeck(`== Missing\n\n${content}`);

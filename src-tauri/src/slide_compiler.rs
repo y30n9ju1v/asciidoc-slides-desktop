@@ -23,11 +23,6 @@ const MAX_DIAGRAM_SVG_BYTES: usize = 5 * 1024 * 1024;
 const COMPILER_THREAD_STACK_BYTES: usize = 32 * 1024 * 1024;
 static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-static NOTO_SANS_KR_REGULAR: &[u8] = include_bytes!("../assets/fonts/NotoSansKR-Regular.otf");
-static NOTO_SANS_KR_BOLD: &[u8] = include_bytes!("../assets/fonts/NotoSansKR-Bold.otf");
-static NOTO_SERIF_KR_REGULAR: &[u8] = include_bytes!("../assets/fonts/NotoSerifKR-Regular.otf");
-static NOTO_SERIF_KR_BOLD: &[u8] = include_bytes!("../assets/fonts/NotoSerifKR-Bold.otf");
-
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportError {
@@ -219,6 +214,14 @@ fn build_pdf_from(
     root: Option<&Path>,
     allowed: &impl Fn(&Path) -> bool,
 ) -> Result<Vec<u8>, ExportError> {
+    if let Some(family) = &request.deck.font_family {
+        if !typst_kit::fonts::system().any(|(_, info)| info.family.eq_ignore_ascii_case(family)) {
+            return Err(ExportError::new(
+                "font-unavailable",
+                "The selected slide font is not installed or readable. Choose another system font.",
+            ));
+        }
+    }
     let assets = load_assets(root, request, allowed)?;
     let asset_paths: HashSet<String> = assets.iter().map(|(path, _)| path.clone()).collect();
     let source = write_slide_deck(&request.deck, &asset_paths)
@@ -227,21 +230,10 @@ fn build_pdf_from(
 }
 
 fn compile_document(source: String, assets: &LoadedAssets) -> Result<PagedDocument, ExportError> {
-    // Fonts are bundled, never scanned from the system, so output is
-    // identical on every machine.
+    // Use installed fonts only; output may vary between machines.
     let engine = TypstEngine::builder()
         .main_file(source)
-        .search_fonts_with(
-            TypstKitFontOptions::new()
-                .include_system_fonts(false)
-                .include_embedded_fonts(true),
-        )
-        .fonts([
-            NOTO_SANS_KR_REGULAR,
-            NOTO_SANS_KR_BOLD,
-            NOTO_SERIF_KR_REGULAR,
-            NOTO_SERIF_KR_BOLD,
-        ])
+        .search_fonts_with(TypstKitFontOptions::new().include_system_fonts(true))
         .with_static_file_resolver(
             assets
                 .iter()
@@ -696,6 +688,22 @@ mod tests {
         assert!(compile_pdf(source, &Vec::new())
             .unwrap()
             .starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn rejects_unavailable_selected_fonts() {
+        let mut req = parse_request(&request("[]")).unwrap();
+        req.deck.font_family = Some("Slides Nonexistent Font 7d6f8c".into());
+        let error = build_pdf_from(&req, None, &|_| true).unwrap_err();
+        assert_eq!(error.code, "font-unavailable");
+    }
+
+    #[test]
+    fn selected_font_is_escaped_in_typst_source() {
+        let mut req = parse_request(&request("[]")).unwrap();
+        req.deck.font_family = Some("font\"; #read(\"secret\")".into());
+        let source = write_slide_deck(&req.deck, &HashSet::new()).unwrap();
+        assert!(source.contains(r#"font\"; #read(\"secret\")"#));
     }
 
     #[test]

@@ -14,7 +14,7 @@ The owner is very happy with the current UI and asked that it not be changed. Do
 restyle, or remove these regions without an explicit request from the owner:
 
 - **Header toolbar** (`src/components/Layout/AppHeader.tsx`): logo, file-tree toggle, New / Open /
-  Save icon buttons, file name with unsaved dot and slide count, then on the right the editor text size (− / +), the style and
+  Save icon buttons, file name with unsaved dot and slide count, then on the right the editor text size (− / +), the slide font (Aa), the style and
   theme selects, Export dropdown, Present button, light/dark toggle, and editor settings.
 - **Workspace** (`src/App.tsx`): collapsible file tree (the deck's folder), Monaco editor,
   draggable resizer, slide preview on the right.

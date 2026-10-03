@@ -154,6 +154,8 @@ impl Default for SlideStyle {
 #[serde(rename_all = "camelCase")]
 pub struct SlideDeck {
     pub version: u32,
+    #[serde(default)]
+    pub font_family: Option<String>,
     pub metadata: SlideDeckMetadata,
     pub theme: SlideTheme,
     #[serde(default)]

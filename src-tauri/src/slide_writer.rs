@@ -14,12 +14,13 @@ use crate::slide_deck::{
     BlockAlign, BlockLayout, HeroAlign, Slide, SlideDeck, SlideLayout, SlideStyle, SlideTheme,
     SlideVideo, StyleFont, TitleDecoration, VideoSource,
 };
-use crate::typst_font::{SANS_FONT_FAMILIES, SERIF_FONT_FAMILIES};
+use crate::typst_font::{
+    MATH_FONT_FAMILIES, MONO_FONT_FAMILIES, SANS_FONT_FAMILIES, SERIF_FONT_FAMILIES,
+};
 use std::collections::HashSet;
 
 /// Nesting deeper than this is refused rather than recursed into.
 const MAX_DEPTH: usize = 48;
-const MONO_FONT_FAMILIES: &[&str] = &["DejaVu Sans Mono", "Noto Sans KR"];
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct WriteError(pub String);
@@ -214,10 +215,16 @@ impl<'a> Writer<'a> {
 
     fn preamble(&mut self, deck: &SlideDeck) {
         let theme = &self.theme;
-        let families = match deck.style.font {
+        let defaults = match deck.style.font {
             StyleFont::Sans => SANS_FONT_FAMILIES,
             StyleFont::Serif => SERIF_FONT_FAMILIES,
         };
+        let families: Vec<&str> = deck
+            .font_family
+            .as_deref()
+            .into_iter()
+            .chain(defaults.iter().copied())
+            .collect();
         let mut out = String::new();
         out.push_str(&format!(
             "#set document(title: {}, author: {})\n",
@@ -230,7 +237,7 @@ impl<'a> Writer<'a> {
         ));
         out.push_str(&format!(
             "#set text(font: {}, size: {}pt, fill: {}",
-            font_array(families),
+            font_array(&families),
             theme.body_size,
             theme.text
         ));
@@ -238,6 +245,10 @@ impl<'a> Writer<'a> {
             out.push_str(&format!(", lang: {}", string_literal(lang)));
         }
         out.push_str(")\n");
+        out.push_str(&format!(
+            "#show math.equation: set text(font: {})\n",
+            font_array(MATH_FONT_FAMILIES)
+        ));
         out.push_str("#set par(leading: 0.55em, spacing: 0.75em, justify: false)\n");
         // Typst shrinks raw text to 0.8em by default; inline code keeps the
         // surrounding size, and code blocks keep the theme's code:body ratio

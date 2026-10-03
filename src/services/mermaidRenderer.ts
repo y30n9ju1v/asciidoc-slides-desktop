@@ -26,7 +26,7 @@ async function render(code: string, dark: boolean): Promise<string | null> {
       theme: dark ? 'dark' : 'default',
       htmlLabels: false,
       flowchart: { htmlLabels: false },
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif",
     });
     const { svg } = await mermaid.render(id, code);
     return DOMPurify.sanitize(svg, {

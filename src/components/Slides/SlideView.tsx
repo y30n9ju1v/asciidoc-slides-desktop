@@ -172,6 +172,7 @@ export function SlideView({ deck, index, documentDir, playback = false }: SlideV
             data-hero-align={deck.style.heroAlign}
             style={{
               ...themeVariables(deck.theme),
+              fontFamily: deck.fontFamily ? JSON.stringify(deck.fontFamily) : undefined,
               width: SLIDE_WIDTH_PX,
               height: SLIDE_HEIGHT_PX,
               transform: `scale(${scale})`,

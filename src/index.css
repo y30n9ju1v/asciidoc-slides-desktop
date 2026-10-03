@@ -331,8 +331,9 @@ body,
   background: var(--slide-bg);
   color: var(--slide-text);
   font-family:
-    'Noto Sans KR',
     'Apple SD Gothic Neo',
+    'Malgun Gothic',
+    'Noto Sans CJK KR',
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
@@ -375,7 +376,7 @@ body,
 }
 
 .slide[data-font='serif'] {
-  font-family: 'Noto Serif KR', 'AppleMyungjo', 'Nanum Myeongjo', Georgia, serif;
+  font-family: 'AppleMyungjo', 'Batang', 'Noto Serif CJK KR', Georgia, serif;
 }
 
 /* Content-slide title decorations (SlideStyle.titleDecoration). */
