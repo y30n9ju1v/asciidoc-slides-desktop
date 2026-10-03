@@ -51,6 +51,10 @@ Pages의 `test:publication`, `release:macos:verify`는 이 저장소에 없다. 
 
 ## 4. 검증 결과를 과장하지 않는다
 
+폰트 검사 회귀는 대문자가 포함된 실제 시스템 폰트 이름과 대소문자 변형을 대상으로 한다. `FontBook.families()`의 표시 이름을 소문자 키 전용 조회에 재사용하지 않고 함께 반환된 인덱스를 사용해야 한다. macOS의 `exports_pdf_with_the_samples_mixed_case_font`는 샘플의 `Apple SD Gothic Neo`로 실제 PDF 바이트 생성을 확인한다.
+
+`codeCallouts.test.ts`는 명시적/자동 번호, 중첩 블록, 설명 없는 코드 보존, 줄 강조 병용, PPTX 텍스트와 시작 예제를 검사한다. PDF 테스트의 강조 코드/설명 문단도 같은 정규화 형태를 사용한다. 실제 출력의 긴 설명 줄바꿈과 슬라이드 넘침은 별도 시각 확인 대상이다.
+
 `validates_selected_fonts_using_the_compilers_font_book`는 같은 Typst 엔진의 검색 결과로 대소문자 무시·선택 생략·없는 폰트 거부를 검사하고 컴파일한다. 내보내기별 중복 검색 제거는 테스트 전체의 성능 개선을 보장하지 않는다. 각 레이아웃 테스트의 독립 검색과 조판 작업은 남아 있으므로 실행 시간은 별도로 측정한다. `mermaidRenderer.test.ts`는 실패한 소스의 재시도와 성공 결과·진행 중 작업 공유를 검사한다.
 
 `closingSlide.test.ts`는 `[.closing]`의 본문·발표자 노트 보존, 기본 머리말·꼬리말·번호 숨김, 개별 재정의와 PPTX 텍스트·가운데 정렬을 검사한다. 네이티브 전체 레이아웃 컴파일 테스트에도 closing 장을 포함한다. 샘플 마지막 장의 실제 WebView·PDF·PowerPoint 배치와 긴 제목의 넘침은 별도 시각 검증 대상이다.

@@ -54,6 +54,22 @@ async function renderImage() {
   );
 }
 
+it('renders code callout markers and formatted explanations with line highlighting', async () => {
+  const deck = await parseSlideDeck(
+    '== Code\n\n[source,python,highlight="1"]\n----\nprint("Hi") # <1>\n----\n<1> Say *hello*.',
+  );
+  await act(async () =>
+    root.render(
+      <SlideAssetsContext.Provider value={{ documentDir: null, theme: deck.theme, playback: false }}>
+        <SlideBlocks slide={deck.slides[0]} />
+      </SlideAssetsContext.Provider>,
+    ),
+  );
+  expect(container.querySelector('pre')?.textContent).toContain('# (1)');
+  expect(container.textContent).toContain('(1) Say hello.');
+  expect(container.querySelector('strong')?.textContent).toBe('hello');
+});
+
 it('updates a mounted image after invalidation and releases its old URL', async () => {
   vi.mocked(readFile)
     .mockResolvedValueOnce(new Uint8Array([1]))

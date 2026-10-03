@@ -4,6 +4,8 @@ Pages의 동명 안내처럼 공통 명세를 복제하지 않고 [공유 SafeDo
 
 ## Slides 전용 계약
 
+- 코드 콜아웃은 공유 SafeDocument 정규화 후 `codeCallouts.ts`에서 코드 줄 끝의 `(번호)`와 설명 `paragraph`로 변환한다. 설명의 안전한 인라인 서식을 유지하며 세 출력기가 기존 코드·문단 렌더링을 재사용한다. Rust 모델 필드나 공유 서브모듈 변경은 필요하지 않다. 최상위 설명에는 원본 코드 블록의 크기·정렬 설정을 적용한다.
+
 - `Slide.layout`의 `closing`은 가운데 정렬 마무리 장이다. 구분 장의 테마·본문 렌더링을 재사용하며, 머리말·꼬리말·번호는 기본 숨김이다. 개별 `slide-header`, `slide-footer`, `slide-page-numbers` 속성으로 재정의할 수 있다. `[.closing]`은 마지막 장 자동 감지가 아닌 명시적인 역할이다.
 
 - TypeScript 기준: [slideDeck.ts](./src/services/slideDeck.ts).

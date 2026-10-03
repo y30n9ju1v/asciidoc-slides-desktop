@@ -23,8 +23,9 @@ export const STARTER_DECK = `= 새 발표 자료: 부제목을 입력하세요
 
 [source,python]
 ----
-print("Hello, slides!")
+print("Hello, slides!") # <1>
 ----
+<1> 화면에 인사말을 출력합니다.
 
 [.small,width=70%]
 |===

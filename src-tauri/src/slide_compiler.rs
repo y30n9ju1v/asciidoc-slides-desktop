@@ -256,12 +256,10 @@ fn compile_document_with_font(
 
 fn validate_selected_font(world: &impl World, family: Option<&str>) -> Result<(), ExportError> {
     let Some(family) = family else { return Ok(()) };
-    let readable = world.book().families().any(|(name, _)| {
-        name.eq_ignore_ascii_case(family)
-            && world
-                .book()
-                .select_family(name)
-                .any(|id| world.font(id).is_some())
+    let readable = world.book().families().any(|(name, mut ids)| {
+        // families() returns display names; select_family() requires lowercase keys.
+        // Use the matching family's indices directly, preserving mixed-case names.
+        name.eq_ignore_ascii_case(family) && ids.any(|id| world.font(id).is_some())
     });
     if readable {
         Ok(())
@@ -737,7 +735,10 @@ mod tests {
             footer: "Conference footer".into(),
             page_number: "42".into(),
         });
-        slide.blocks = serde_json::from_value(serde_json::json!([{"type":"code", "code":"a\nb\nc", "language":"python", "caption":null, "location":{"line":1}}])).unwrap();
+        slide.blocks = serde_json::from_value(serde_json::json!([
+            {"type":"code", "code":"a\nb # (1)\nc", "language":"python", "caption":null, "location":{"line":1}},
+            {"type":"paragraph", "text":"(1) Explanation", "inlines":[{"type":"text", "value":"(1) Explanation"}], "location":{"line":1}}
+        ])).unwrap();
         slide.block_layouts = vec![Some(crate::slide_deck::BlockLayout {
             width: None,
             scale: Some(0.8),
@@ -749,6 +750,7 @@ mod tests {
         let source = write_slide_deck(&request.deck, &paths).unwrap();
         assert!(source.contains("background.svg"));
         assert!(source.contains("2  b"));
+        assert!(source.contains("(1) Explanation"));
         assert!(source.contains("Company header"));
         assert!(source.contains("Conference footer"));
         assert!(source.contains("42"));
@@ -766,14 +768,14 @@ mod tests {
                 let family = world
                     .book()
                     .families()
-                    .find_map(|(name, _)| {
-                        world
-                            .book()
-                            .select_family(name)
-                            .any(|id| world.font(id).is_some())
-                            .then(|| name.to_owned())
+                    .find_map(|(name, mut ids)| {
+                        (name.chars().any(char::is_uppercase)
+                            && ids.any(|id| world.font(id).is_some()))
+                        .then(|| name.to_owned())
                     })
-                    .expect("PDF tests require at least one readable system font");
+                    .expect("PDF tests require a readable mixed-case system font family");
+                assert!(validate_selected_font(world, Some(&family)).is_ok());
+                assert!(validate_selected_font(world, Some(&family.to_lowercase())).is_ok());
                 assert!(validate_selected_font(world, Some(&family.to_uppercase())).is_ok());
                 assert!(validate_selected_font(world, None).is_ok());
                 assert_eq!(
@@ -794,6 +796,16 @@ mod tests {
         req.deck.font_family = Some("Slides Nonexistent Font 7d6f8c".into());
         let error = build_pdf_from(&req, None, &|_| true).unwrap_err();
         assert_eq!(error.code, "font-unavailable");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn exports_pdf_with_the_samples_mixed_case_font() {
+        let mut req = parse_request(&request(&rich_slides())).unwrap();
+        req.deck.slides.truncate(1);
+        req.deck.font_family = Some("Apple SD Gothic Neo".into());
+        let pdf = build_pdf_from(&req, None, &|_| true).unwrap();
+        assert!(pdf.starts_with(b"%PDF"));
     }
 
     #[test]

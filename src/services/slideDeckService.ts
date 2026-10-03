@@ -8,6 +8,7 @@ import {
   type SafeDiagnostic,
 } from '../../packages/asciidoc-typst/typescript/src';
 import { blockLayoutOf } from './blockLayout';
+import { expandCodeCallouts, groupCodeCallouts } from './codeCallouts';
 import { resolveSlideChrome, type ChromeSettings } from './slideChrome';
 import { parseVideoNode, placeVideo } from './slideVideo';
 import { blocksToPlainText } from './safeText';
@@ -128,7 +129,8 @@ class DeckBuilder {
   private normalizeBody(nodes: AsciidocNode[]) {
     const blocks: { block: SafeBlock; layout: BlockLayout | null }[] = [];
     const videos: SlideVideo[] = [];
-    for (const node of nodes) {
+    for (const group of groupCodeCallouts(nodes)) {
+      const node = group[0];
       const layout = blockLayoutOf(rolesOf(node), node.attributes);
       if (node.context === 'video') {
         const parsed = parseVideoNode(node);
@@ -139,7 +141,7 @@ class DeckBuilder {
         }
         continue;
       }
-      this.normalize([node]).forEach((block) => blocks.push({ block, layout }));
+      this.normalize(group).forEach((block) => blocks.push({ block, layout }));
     }
     return { blocks, videos };
   }
@@ -149,7 +151,7 @@ class DeckBuilder {
     const prepared = nodes.map((node) => prepareNode(node, this.diagnostics));
     const safe = normalizeSafeDocument({ blocks: prepared }, { title: '', author: '', language: '' });
     this.diagnostics.push(...safe.diagnostics);
-    return safe.blocks;
+    return expandCodeCallouts(safe.blocks);
   }
 }
 
