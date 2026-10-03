@@ -3,6 +3,7 @@ import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers 
 import { inlinesToPlainText } from './safeText';
 import type { BlockLayout, SlideVideo } from './slideDeck';
 import { slideItems } from './slideItems';
+import { ADMONITION_LABELS, isSafeLinkTarget, splitIntoColumns } from './slideRules';
 import type { SlideTheme } from './slideThemes';
 
 /**
@@ -62,14 +63,6 @@ type Element = (
   | { kind: 'video'; video: SlideVideo }
 ) & { layout?: BlockLayout };
 
-const ADMONITION_LABELS: Record<string, string> = {
-  note: 'NOTE',
-  tip: 'TIP',
-  important: 'IMPORTANT',
-  warning: 'WARNING',
-  caution: 'CAUTION',
-};
-
 interface RunStyle {
   bold?: boolean;
   italic?: boolean;
@@ -79,8 +72,6 @@ interface RunStyle {
   link?: string;
   muted?: boolean;
 }
-
-const SAFE_LINK_RE = /^(https?:\/\/|mailto:)/i;
 
 const styled =
   (patch: RunStyle) =>
@@ -100,7 +91,7 @@ const INLINE_RUNS: InlineHandlers<Run[], RunStyle> = {
   subscript: styled({ subscript: true }),
   mark: styled({ highlight: true }),
   link: (inline, style) => {
-    const link = SAFE_LINK_RE.test(inline.target) ? inline.target : undefined;
+    const link = isSafeLinkTarget(inline.target) ? inline.target : undefined;
     const children = inline.children.length ? inline.children : [{ type: 'text' as const, value: inline.target }];
     return inlineRuns(children, { ...style, link });
   },
@@ -132,12 +123,6 @@ function pushParagraph(out: Element[], paragraph: Paragraph): void {
   // Prose merges into one text box, but never into a block with its own sizing.
   if (last?.kind === 'text' && !last.layout) last.paragraphs.push(paragraph);
   else out.push({ kind: 'text', paragraphs: [paragraph] });
-}
-
-function splitIntoColumns<T>(items: T[], count: number): T[][] {
-  if (items.length === 0) return Array.from({ length: count }, () => []);
-  const size = Math.ceil(items.length / count);
-  return Array.from({ length: count }, (_, index) => items.slice(index * size, (index + 1) * size));
 }
 
 interface ElementContext {
@@ -198,7 +183,7 @@ const BLOCK_ELEMENTS: BlockHandlers<void, ElementContext> = {
       pushParagraph(out, paragraphOf([{ text: `— ${source}`, muted: true }], level, { scale: 0.8, indent: 0.3 }));
   },
   admonition: (block, { out, level }) => {
-    const label: Run = { text: `${ADMONITION_LABELS[block.kind] ?? 'NOTE'}  `, bold: true, color: 'accent' };
+    const label: Run = { text: `${ADMONITION_LABELS[block.kind]}  `, bold: true, color: 'accent' };
     pushParagraph(out, paragraphOf([label, ...inlineRuns(block.inlines)], level, { indent: 0.15 }));
   },
   mathBlock: (block, { out, level }) =>

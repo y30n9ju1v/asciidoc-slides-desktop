@@ -1,13 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { invoke } from '@tauri-apps/api/core';
-import { chooseExportFile, confirmExportWarnings, writeBinaryFile } from './documentFileAdapter';
+import { chooseExportFile, confirmExportWarnings, exportSlidesPdf, writeBinaryFile } from './documentFileAdapter';
 import { buildPptx } from './pptxExporter';
 import { parseSlideDeck } from './slideDeckService';
 import { clearImageCache } from './imageStore';
 import { renderMermaidSvg } from './mermaidRenderer';
 import { exportDocument } from './exportService';
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 vi.mock('./documentFileAdapter');
 vi.mock('./pptxExporter', () => ({ buildPptx: vi.fn() }));
 vi.mock('./imageStore', () => ({ clearImageCache: vi.fn() }));
@@ -53,7 +51,7 @@ it('does not report a successful PDF when a diagram cannot render', async () => 
       documentDir: null,
     }),
   ).rejects.toThrow('Mermaid');
-  expect(invoke).not.toHaveBeenCalled();
+  expect(exportSlidesPdf).not.toHaveBeenCalled();
 });
 
 it('lets users cancel a lossy PPTX before choosing or writing an output', async () => {
@@ -82,15 +80,12 @@ it('blocks error diagnostics rather than asking to bypass them', async () => {
     exportDocument('pdf', { text: '== S\n\n++++\n<script>bad()</script>\n++++', path: null, documentDir: null }),
   ).rejects.toThrow();
   expect(confirmExportWarnings).not.toHaveBeenCalled();
-  expect(invoke).not.toHaveBeenCalled();
+  expect(exportSlidesPdf).not.toHaveBeenCalled();
 });
 
 it('passes the captured source and root to PDF and propagates write failures', async () => {
   await exportDocument('pdf', { text: '== PDF\ncontent', path: '/B/deck.adoc', documentDir: '/B' });
-  expect(invoke).toHaveBeenCalledWith('export_slides_pdf', {
-    outputPath: '/out.pptx',
-    requestJson: expect.stringContaining('"documentRoot":"/B"'),
-  });
+  expect(exportSlidesPdf).toHaveBeenCalledWith(expect.stringContaining('"documentRoot":"/B"'), '/out.pptx');
   vi.mocked(writeBinaryFile).mockRejectedValueOnce(new Error('disk full'));
   await expect(exportDocument('pptx', { text: '== S\ncontent', path: null, documentDir: null })).rejects.toThrow(
     'disk full',

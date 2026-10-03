@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, FileText, Folder, Image as ImageIcon, File, RefreshCw, Film } from 'lucide-react';
 import { entryKind, listDirectory, type Entry, type EntryKind } from '../../services/explorerEntries';
 import { cn } from '@/lib/utils';
+import { baseName } from '../../services/pathNames';
 
 interface FileExplorerProps {
   onRefresh?: () => void;
@@ -115,7 +116,7 @@ export function FileExplorer({ root, onRefresh, ...actions }: FileExplorerProps)
     <div className="flex h-full flex-col">
       <div className="flex h-9 shrink-0 items-center justify-between px-3 text-xs font-semibold tracking-wide text-[var(--text-subtle)] uppercase">
         <span className="truncate" title={root}>
-          {root.split(/[\\/]/).filter(Boolean).pop()}
+          {baseName(root)}
         </span>
         <button
           type="button"

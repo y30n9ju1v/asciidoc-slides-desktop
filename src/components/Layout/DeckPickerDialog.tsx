@@ -1,4 +1,5 @@
 import { FileText } from 'lucide-react';
+import { baseName } from '../../services/pathNames';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface DeckPickerDialogProps {
@@ -24,7 +25,7 @@ export function DeckPickerDialog({ decks, onPick, onClose }: DeckPickerDialogPro
                 onClick={() => onPick(path)}
               >
                 <FileText className="size-4 shrink-0 text-[var(--text-muted)]" />
-                <span className="truncate">{path.split(/[\\/]/).pop()}</span>
+                <span className="truncate">{baseName(path)}</span>
               </button>
             </li>
           ))}

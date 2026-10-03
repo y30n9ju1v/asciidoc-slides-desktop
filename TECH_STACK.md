@@ -38,8 +38,9 @@ Monaco 원문 → parseSlideDeck → SlideDeck (SafeBlock + 슬라이드별 데�
 
 ## 4. 보안·외부 경계
 
-- 파일 선택과 저장은 `documentFileAdapter.ts`, 자산은 `imageStore.ts`·`videoStore.ts` 같은 경계를 이용한다.
-- `assetAdapter.ts` → Rust `asset_paths.rs`가 현재 덱 안의 실제 경로와 런타임 스코프를 확인한다. 창 제목·전체 화면 호출은 `windowAdapter.ts`에 모은다.
+- 파일 선택·저장·확인 대화상자·PDF 내보내기 명령은 `documentFileAdapter.ts`, 자산은 `imageStore.ts`·`videoStore.ts`, 유튜브 브라우저 열기는 `externalLinkAdapter.ts` 경계를 이용한다. 훅과 컴포넌트는 Tauri API를 직접 호출하지 않는다.
+- `assetAdapter.ts` → Rust `asset_paths.rs`가 현재 덱 안의 실제 경로와 런타임 스코프를 확인한다. 창 제목·전체 화면·닫기 요청은 `windowAdapter.ts`에 모은다.
+- 미리보기와 PPTX가 공유하는 표시 규칙(허용 링크·단 나누기·알림 라벨)은 `slideRules.ts`, 파일 이름·확장자 해석은 `pathNames.ts`의 순수 함수로 한 곳에 둔다.
 - Tauri capability, 런타임 경로 스코프, 문서 상대 경로 검증은 서로 대체하지 않는 방어 계층이다.
 - 로컬 동영상은 asset 프로토콜, 유튜브는 발표 중 명시적인 재생 조작 후 제한된 iframe으로 표시한다. 편집 미리보기는 유튜브에 접속하지 않는다.
 - 공유 모델·Rust 요청에는 HTML·DOM·완성된 Typst 소스를 넣지 않는다. 세부 계약은 [SAFE_DOCUMENT_SPEC.md](./SAFE_DOCUMENT_SPEC.md)를 따른다.

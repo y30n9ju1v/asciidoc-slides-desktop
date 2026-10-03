@@ -3,12 +3,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SlideView } from './SlideView';
 import { parseSlideDeck } from '../../services/slideDeckService';
-import { localVideoUrl, openYoutubeVideo } from '../../services/videoStore';
+import { localVideoUrl } from '../../services/videoStore';
+import { openYoutubeVideo } from '../../services/externalLinkAdapter';
 
 vi.mock('../../services/videoStore', () => ({
   localVideoUrl: vi.fn(async () => 'asset://clip.mp4'),
-  openYoutubeVideo: vi.fn(),
 }));
+vi.mock('../../services/externalLinkAdapter', () => ({ openYoutubeVideo: vi.fn() }));
 vi.mock('./useSlideImageUrl', () => ({ useSlideImageUrl: () => ({ url: null, error: null, loading: false }) }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root;

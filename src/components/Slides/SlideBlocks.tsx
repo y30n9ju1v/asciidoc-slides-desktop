@@ -12,6 +12,7 @@ import { renderMermaidSvg } from '../../services/mermaidRenderer';
 import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from '../../services/safeDispatch';
 import type { BlockLayout, Slide } from '../../services/slideDeck';
 import { slideItems } from '../../services/slideItems';
+import { ADMONITION_LABELS, isSafeLinkTarget, splitIntoColumns } from '../../services/slideRules';
 import { SlideVideo } from './SlideVideo';
 import { useSlideAssets } from './SlideAssetsContext';
 import { useSlideImageUrl } from './useSlideImageUrl';
@@ -21,8 +22,6 @@ import { useSlideImageUrl } from './useSlideImageUrl';
  * (escaped); the only HTML strings injected come from highlight.js (which
  * escapes its input), KaTeX with `trust: false`, and Mermaid in strict mode.
  */
-
-const SAFE_LINK_RE = /^(https?:\/\/|mailto:)/i;
 
 const ADMONITION_COLORS: Record<string, string> = {
   note: '#2563eb',
@@ -180,7 +179,7 @@ const INLINE_VIEWS: InlineHandlers<ReactNode> = {
     const children = inline.children.length ? <Inlines inlines={inline.children} /> : inline.target;
     // Links never navigate the app window; they are styled text here and
     // become real hyperlinks in PPTX/PDF.
-    return SAFE_LINK_RE.test(inline.target) ? <a title={inline.target}>{children}</a> : <>{children}</>;
+    return isSafeLinkTarget(inline.target) ? <a title={inline.target}>{children}</a> : <>{children}</>;
   },
   footnote: noteView,
   endnote: noteView,
@@ -221,12 +220,6 @@ function TableBlock({ rows, hasHeader }: { rows: SafeTableCell[][]; hasHeader: b
       </tbody>
     </table>
   );
-}
-
-function splitIntoColumns(blocks: SafeBlock[], count: number): SafeBlock[][] {
-  if (blocks.length === 0) return Array.from({ length: count }, () => []);
-  const size = Math.ceil(blocks.length / count);
-  return Array.from({ length: count }, (_, index) => blocks.slice(index * size, (index + 1) * size));
 }
 
 function Caption({ text }: { text: string | null | undefined }) {
@@ -314,7 +307,7 @@ const BLOCK_VIEWS: BlockHandlers<ReactNode> = {
       className="slide-admonition"
       style={{ '--admonition-color': ADMONITION_COLORS[block.kind] ?? ADMONITION_COLORS.note } as CSSProperties}
     >
-      <span className="slide-admonition-label">{block.kind.toUpperCase()}</span>
+      <span className="slide-admonition-label">{ADMONITION_LABELS[block.kind]}</span>
       <Inlines inlines={block.inlines} />
     </div>
   ),

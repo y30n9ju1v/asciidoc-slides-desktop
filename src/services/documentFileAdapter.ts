@@ -12,6 +12,20 @@ export function confirmExportWarnings(messages: string[]): Promise<boolean> {
   });
 }
 
+/** Asks before discarding unsaved edits; falls back to the browser prompt outside Tauri. */
+export async function confirmDiscardChanges(): Promise<boolean> {
+  try {
+    return await ask('You have unsaved changes. Discard them?', { title: 'Unsaved changes', kind: 'warning' });
+  } catch {
+    return window.confirm('You have unsaved changes. Discard them?');
+  }
+}
+
+/** Native PDF compile and write; `outputPath` must come from `chooseExportFile`. */
+export function exportSlidesPdf(requestJson: string, outputPath: string): Promise<void> {
+  return invoke('export_slides_pdf', { requestJson, outputPath });
+}
+
 export interface DeckFolder {
   folder: string;
   /** Absolute paths of the `.adoc`/`.asciidoc` files directly inside `folder`. */

@@ -1,17 +1,13 @@
 import { readFile, stat } from '@tauri-apps/plugin-fs';
 import { resolveDocumentAsset } from './assetAdapter';
 import { blobToDataUrl } from './imageStore';
-import { isVideoSource, videoMimeType, youtubeWatchUrl } from './slideVideo';
+import { fileExtension } from './pathNames';
+import { isVideoSource, videoMimeType } from './slideVideo';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { openUrl } from '@tauri-apps/plugin-opener';
 
 export async function localVideoUrl(documentDir: string, relativePath: string, start: number | null): Promise<string> {
   if (!isVideoSource({ kind: 'file', relativePath })) throw new Error('Video must be inside the deck folder.');
   return `${convertFileSrc(await resolveDocumentAsset(documentDir, relativePath))}${start ? `#t=${start}` : ''}`;
-}
-
-export function openYoutubeVideo(id: string, start: number | null): Promise<void> {
-  return openUrl(youtubeWatchUrl(id, start));
 }
 
 /** PowerPoint embeds the whole file, and building it needs the bytes in memory several times over. */
@@ -36,7 +32,7 @@ export async function loadVideoData(documentDir: string | null, relativePath: st
     }
     const bytes = await readFile(path);
     if (bytes.byteLength > MAX_EMBEDDED_VIDEO_BYTES) return { error: 'video grew beyond the embedding size limit' };
-    const extn = relativePath.split('.').pop()?.toLowerCase() ?? 'mp4';
+    const extn = fileExtension(relativePath) || 'mp4';
     return { data: await blobToDataUrl(new Blob([bytes], { type: mime })), extn };
   } catch (error) {
     return { error: String(error) };

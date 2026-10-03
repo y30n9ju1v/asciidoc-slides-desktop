@@ -1,4 +1,5 @@
 import type { SafeBlock, SafeInline } from '../../packages/asciidoc-typst/typescript/src';
+import { fileExtension, ownValue } from './pathNames';
 import type { SlideDeck } from './slideDeck';
 
 /** Visits every block in a block tree, including list items, table cells' parents, and containers. */
@@ -115,8 +116,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 };
 
 export function imageMimeType(path: string): string | null {
-  const extension = path.split('.').pop()?.toLowerCase() ?? '';
-  return MIME_BY_EXTENSION[extension] ?? null;
+  return ownValue(MIME_BY_EXTENSION, fileExtension(path));
 }
 
 /**

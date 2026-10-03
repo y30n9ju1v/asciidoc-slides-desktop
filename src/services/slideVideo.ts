@@ -1,5 +1,6 @@
 import { plainText, resolveSafeAssetRef, type SafeDiagnostic } from '../../packages/asciidoc-typst/typescript/src';
 import { imageMimeType } from './deckAssets';
+import { fileExtension, ownValue } from './pathNames';
 import type { BlockLayout, SlideVideo, VideoSource } from './slideDeck';
 
 /** The parts of an Asciidoctor `video` node this module reads. */
@@ -21,10 +22,7 @@ const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
 };
 
 export function videoMimeType(path: string): string | null {
-  const extension = path.split('.').pop()?.toLowerCase() ?? '';
-  return Object.prototype.hasOwnProperty.call(VIDEO_MIME_BY_EXTENSION, extension)
-    ? VIDEO_MIME_BY_EXTENSION[extension]
-    : null;
+  return ownValue(VIDEO_MIME_BY_EXTENSION, fileExtension(path));
 }
 
 export function isYoutubeId(value: string): boolean {

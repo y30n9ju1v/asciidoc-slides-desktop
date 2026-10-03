@@ -14,6 +14,7 @@ import { useEditorResize } from './hooks/useEditorResize';
 import { useImageRefresh } from './hooks/useImageRefresh';
 import { useSlideDeck } from './hooks/useSlideDeck';
 import { pathRelativeTo } from './services/deckAssets';
+import { baseName } from './services/pathNames';
 import { exportDocument, exportErrorMessage, type ExportFormat } from './services/exportService';
 import { slideIndexForLine } from './services/slideNavigation';
 import { withHeaderAttribute } from './services/headerAttributes';
@@ -27,7 +28,7 @@ const AsciidocEditor = lazy(() =>
 );
 
 function fileNameOf(path: string | null): string {
-  return path?.split(/[\\/]/).pop() ?? 'Untitled.adoc';
+  return (path && baseName(path)) || 'Untitled.adoc';
 }
 
 /** Header-facing facts about the (possibly still loading) deck. */

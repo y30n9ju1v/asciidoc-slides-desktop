@@ -2,8 +2,9 @@ import { useState, type CSSProperties, type MouseEvent } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
 import type { SlideVideo as SlideVideoModel } from '../../services/slideDeck';
 import { isVideoSource, youtubeEmbedUrl } from '../../services/slideVideo';
-import { openYoutubeVideo } from '../../services/videoStore';
+import { openYoutubeVideo } from '../../services/externalLinkAdapter';
 import { useLocalVideoUrl } from '../../hooks/useLocalVideoUrl';
+import { baseName } from '../../services/pathNames';
 import { useSlideAssets } from './SlideAssetsContext';
 import { useSlideImageUrl } from './useSlideImageUrl';
 
@@ -15,7 +16,7 @@ const keepClick = (event: MouseEvent) => event.stopPropagation();
 
 function videoLabel(video: SlideVideoModel): string {
   if (video.title) return video.title;
-  return video.source.kind === 'youtube' ? 'YouTube video' : (video.source.relativePath.split('/').pop() ?? 'Video');
+  return video.source.kind === 'youtube' ? 'YouTube video' : baseName(video.source.relativePath) || 'Video';
 }
 
 /** Poster image (or a plain card) with a play badge - what every non-playing state shows. */

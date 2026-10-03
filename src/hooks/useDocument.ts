@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ask } from '@tauri-apps/plugin-dialog';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { onWindowCloseRequested } from '../services/windowAdapter';
 import {
   chooseDeckFolder,
+  confirmDiscardChanges,
   chooseDocumentSavePath,
   onLaunchDocument,
   readDocumentText,
@@ -19,14 +19,6 @@ interface DocumentState {
   text: string;
   /** Text as last read from or written to disk; for an untitled deck, its starting text. */
   baseline: string;
-}
-
-async function confirmDiscard(): Promise<boolean> {
-  try {
-    return await ask('You have unsaved changes. Discard them?', { title: 'Unsaved changes', kind: 'warning' });
-  } catch {
-    return window.confirm('You have unsaved changes. Discard them?');
-  }
 }
 
 async function diskText(path: string): Promise<string | null> {
@@ -61,7 +53,7 @@ export function useDocument() {
   const beginTransition = useCallback(async () => {
     const sequence = ++transition.current;
     const current = stateRef.current;
-    const allowed = current.text === current.baseline || (await confirmDiscard());
+    const allowed = current.text === current.baseline || (await confirmDiscardChanges());
     if (!allowed || sequence !== transition.current || current !== stateRef.current) return null;
     return { sequence, document: current };
   }, []);
@@ -181,41 +173,28 @@ export function useDocument() {
     let unlisten: (() => void) | undefined;
     let disposed = false;
     let confirming = false;
-    try {
-      void getCurrentWindow()
-        .onCloseRequested(async (event) => {
-          if (confirming || saving.current) {
-            event.preventDefault();
-            return;
-          }
-          const current = stateRef.current;
-          const sequence = transition.current;
-          if (current.text === current.baseline) return;
-          confirming = true;
-          try {
-            const allowed = await confirmDiscard();
-            if (
-              !allowed ||
-              disposed ||
-              saving.current ||
-              current !== stateRef.current ||
-              sequence !== transition.current
-            )
-              event.preventDefault();
-          } catch {
-            event.preventDefault();
-          } finally {
-            confirming = false;
-          }
-        })
-        .then((dispose) => {
-          if (disposed) dispose();
-          else unlisten = dispose;
-        })
-        .catch(() => undefined);
-    } catch {
-      // Not running inside Tauri (plain browser preview).
-    }
+    void onWindowCloseRequested(async (event) => {
+      if (confirming || saving.current) {
+        event.preventDefault();
+        return;
+      }
+      const current = stateRef.current;
+      const sequence = transition.current;
+      if (current.text === current.baseline) return;
+      confirming = true;
+      try {
+        const allowed = await confirmDiscardChanges();
+        const stale = disposed || saving.current || current !== stateRef.current || sequence !== transition.current;
+        if (!allowed || stale) event.preventDefault();
+      } catch {
+        event.preventDefault();
+      } finally {
+        confirming = false;
+      }
+    }).then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    });
     return () => {
       disposed = true;
       unlisten?.();

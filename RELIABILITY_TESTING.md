@@ -24,16 +24,16 @@ Pages의 `test:publication`, `release:macos:verify`는 이 저장소에 없다. 
 
 ## 2. 현재 자동 검증의 주요 경계
 
-| 영역           | 코드·테스트                                                                                                                                 | 확인 대상                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 문서 저장·전환 | `src/hooks/useDocument.test.ts`                                                                                                             | 저장 중 편집 보존, 실패 후 재시도, 오래된 읽기 무시, Save As 도중 문서 전환 |
-| 원자적 저장    | `src-tauri/src/document_store.rs`                                                                                                           | 디스크 충돌, 스코프 거부, 임시 파일 생성 실패 시 원본 보존                  |
-| 미리보기       | `src/hooks/useSlideDeck.test.ts`                                                                                                            | 이전 비동기 파싱 결과가 최신 문서를 덮어쓰지 않음                           |
-| 내보내기       | `src/services/exportService.test.ts`, `exportPreflight.test.ts`                                                                             | 최신 원문 사용, 오류 차단, 경고 확인·취소                                   |
-| PPTX           | `src/services/pptxExporter.test.ts`, `pptxVideo.test.ts`                                                                                    | 생성된 파일 구조와 미디어, 실패 처리                                        |
-| PDF            | `src-tauri/src/slide_compiler.rs`, `slide_writer.rs`                                                                                        | 레이아웃·블록 컴파일, 페이지 수, 입력 검증·이스케이프                       |
-| 자산           | `src/services/videoStore.test.ts`, `imageStore.test.ts`, `src-tauri/src/fs_scope_commands.rs`                                               | 경로 검증, 이미지 캐시, 폴더 허용 후 민감 경로 차단 유지                    |
-| 발표·편집 UX   | `src/components/Slides/Presenter.test.tsx`, `src/hooks/usePointerActivity.test.tsx`, `src/components/Layout/EditorTextSizeControl.test.tsx` | 포커스·키보드, 타이머 정리, 글자 크기 범위·저장                             |
+| 영역           | 코드·테스트                                                                                                                                 | 확인 대상                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 문서 저장·전환 | `src/hooks/useDocument.test.ts`                                                                                                             | 저장 중 편집 보존, 실패 후 재시도, 오래된 읽기 무시, Save As 도중 문서 전환   |
+| 원자적 저장    | `src-tauri/src/document_store.rs`                                                                                                           | 디스크 충돌, 스코프 거부, 임시 파일 생성 실패 시 원본 보존                    |
+| 미리보기       | `src/hooks/useSlideDeck.test.ts`                                                                                                            | 이전 비동기 파싱 결과가 최신 문서를 덮어쓰지 않음                             |
+| 내보내기       | `src/services/exportService.test.ts`, `exportPreflight.test.ts`                                                                             | 최신 원문 사용, 오류 차단, 경고 확인·취소                                     |
+| PPTX           | `src/services/pptxExporter.test.ts`, `pptxVideo.test.ts`                                                                                    | 생성된 파일 구조와 미디어, 실패 처리                                          |
+| PDF            | `src-tauri/src/slide_compiler.rs`, `slide_writer.rs`                                                                                        | 레이아웃·블록 컴파일, 페이지 수, 입력 검증·이스케이프                         |
+| 자산           | `src/services/videoStore.test.ts`, `imageStore.test.ts`, `pathNames.test.ts`, `src-tauri/src/fs_scope_commands.rs`                          | 경로 검증, 확장자·상속 키 판별, 이미지 캐시, 폴더 허용 후 민감 경로 차단 유지 |
+| 발표·편집 UX   | `src/components/Slides/Presenter.test.tsx`, `src/hooks/usePointerActivity.test.tsx`, `src/components/Layout/EditorTextSizeControl.test.tsx` | 포커스·키보드, 타이머 정리, 글자 크기 범위·저장                               |
 
 변경한 경계에는 정상 입력뿐 아니라 빈 입력, 취소, 잘못된 입력, 실패, 응답 순서 역전을 추가한다. 새 파일 시스템 테스트는 전용 임시 디렉터리만 사용하며 사용자 덱을 수정하지 않는다.
 

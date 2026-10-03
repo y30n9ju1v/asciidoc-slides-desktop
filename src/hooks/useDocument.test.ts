@@ -1,13 +1,11 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ask } from '@tauri-apps/plugin-dialog';
 import * as files from '../services/documentFileAdapter';
 import { deferred, renderHook } from '../test/renderHook';
 import { useDocument } from './useDocument';
 
 vi.mock('../services/documentFileAdapter');
 vi.mock('../services/imageStore', () => ({ clearImageCache: vi.fn() }));
-vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn() }));
 const close = vi.hoisted(() => ({
   handler: null as null | ((event: { preventDefault: () => void }) => Promise<void>),
 }));
@@ -22,7 +20,7 @@ vi.mock('@tauri-apps/api/window', () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(ask).mockResolvedValue(true);
+  vi.mocked(files.confirmDiscardChanges).mockResolvedValue(true);
   vi.mocked(files.takeLaunchDocument).mockResolvedValue(null);
   vi.mocked(files.onLaunchDocument).mockResolvedValue(() => {});
   vi.mocked(files.readDocumentText).mockImplementation(async (path) => `${path} content`);
@@ -83,7 +81,7 @@ describe('document operation ownership', () => {
     const hook = await renderHook(useDocument);
     await act(async () => hook.current.setText('first edit'));
     const answer = deferred<boolean>();
-    vi.mocked(ask).mockReturnValueOnce(answer.promise);
+    vi.mocked(files.confirmDiscardChanges).mockReturnValueOnce(answer.promise);
     const event = { preventDefault: vi.fn() };
     const pending = close.handler!(event);
     await act(async () => hook.current.setText('new edit'));
@@ -97,13 +95,13 @@ describe('document operation ownership', () => {
     const hook = await renderHook(useDocument);
     await act(async () => hook.current.setText('edited'));
     const answer = deferred<boolean>();
-    vi.mocked(ask).mockReturnValueOnce(answer.promise);
+    vi.mocked(files.confirmDiscardChanges).mockReturnValueOnce(answer.promise);
     const first = { preventDefault: vi.fn() };
     const second = { preventDefault: vi.fn() };
     const pending = close.handler!(first);
     await close.handler!(second);
     expect(second.preventDefault).toHaveBeenCalledOnce();
-    expect(ask).toHaveBeenCalledOnce();
+    expect(files.confirmDiscardChanges).toHaveBeenCalledOnce();
     answer.resolve(true);
     await pending;
     expect(first.preventDefault).not.toHaveBeenCalled();
@@ -211,7 +209,7 @@ describe('document operation ownership', () => {
   it('checks unsaved edits when a deck is chosen from the folder dialog', async () => {
     const hook = await renderHook(useDocument);
     await act(async () => hook.current.setText('unsaved'));
-    vi.mocked(ask).mockResolvedValue(false);
+    vi.mocked(files.confirmDiscardChanges).mockResolvedValue(false);
     await act(async () => hook.current.openPath('/B.adoc'));
     expect(files.readDocumentText).not.toHaveBeenCalled();
     expect(hook.current.text).toBe('unsaved');
@@ -234,7 +232,7 @@ describe('decks handed over by the OS', () => {
     });
     const hook = await renderHook(useDocument);
     await act(async () => hook.current.setText('edited'));
-    vi.mocked(ask).mockResolvedValueOnce(false);
+    vi.mocked(files.confirmDiscardChanges).mockResolvedValueOnce(false);
     vi.mocked(files.takeLaunchDocument).mockResolvedValueOnce('/Finder.adoc');
     await act(async () => deliver());
     expect(hook.current).toMatchObject({ path: null, text: 'edited' });

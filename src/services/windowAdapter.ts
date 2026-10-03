@@ -19,3 +19,16 @@ export async function setApplicationTitle(title: string): Promise<void> {
     // Browser preview has no native title bar.
   }
 }
+
+export interface CloseRequest {
+  preventDefault(): void;
+}
+
+/** Subscribes to the window's close request; resolves to an unsubscribe (a no-op outside Tauri). */
+export async function onWindowCloseRequested(handler: (event: CloseRequest) => Promise<void>): Promise<() => void> {
+  try {
+    return await getCurrentWindow().onCloseRequested(handler);
+  } catch {
+    return () => undefined;
+  }
+}

@@ -1,10 +1,10 @@
-import { invoke } from '@tauri-apps/api/core';
 import { deckDiagramSources, deckImagePaths, diagramAssetPath } from './deckAssets';
-import { chooseExportFile, confirmExportWarnings, writeBinaryFile } from './documentFileAdapter';
+import { chooseExportFile, confirmExportWarnings, exportSlidesPdf, writeBinaryFile } from './documentFileAdapter';
 import { renderMermaidSvg } from './mermaidRenderer';
 import { buildPptx } from './pptxExporter';
 import type { SlideDeck } from './slideDeck';
 import { inspectExport, type ExportFormat } from './exportPreflight';
+import { stemName } from './pathNames';
 import { parseSlideDeck } from './slideDeckService';
 import { clearImageCache } from './imageStore';
 
@@ -35,10 +35,7 @@ export async function buildPdfRequest(deck: SlideDeck, documentDir: string | nul
 
 function exportFileName(documentPath: string | null, deck: SlideDeck, extension: string): string {
   const base =
-    documentPath
-      ?.split(/[\\/]/)
-      .pop()
-      ?.replace(/\.[^.]+$/, '') ||
+    (documentPath ? stemName(documentPath) : '') ||
     deck.metadata.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() ||
     'slides';
   return `${base}.${extension}`;
@@ -66,7 +63,7 @@ export async function exportDeck(
   clearImageCache();
   if (isPdf) {
     const requestJson = JSON.stringify(await buildPdfRequest(deck, documentDir));
-    await invoke('export_slides_pdf', { requestJson, outputPath });
+    await exportSlidesPdf(requestJson, outputPath);
   } else {
     await writeBinaryFile(outputPath, await buildPptx(deck, documentDir));
   }
