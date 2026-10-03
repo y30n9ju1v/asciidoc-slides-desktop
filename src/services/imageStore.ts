@@ -75,6 +75,31 @@ export function imageSize(url: string): Promise<{ width: number; height: number 
   });
 }
 
+/** Re-encodes any browser-decodable image as a PNG data URL (PowerPoint video covers must be PNG). */
+export async function blobToPngDataUrl(blob: Blob): Promise<string | null> {
+  if (blob.type === 'image/svg+xml') return (await svgToPngDataUrl(await blob.text(), 1))?.url ?? null;
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('image could not be decoded'));
+      image.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth || 1;
+    canvas.height = image.naturalHeight || 1;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 /** Rasterizes an SVG string to a PNG data URL (PowerPoint's SVG support varies). */
 export async function svgToPngDataUrl(
   svg: string,

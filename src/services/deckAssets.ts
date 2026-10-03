@@ -61,7 +61,13 @@ export function deckImagePaths(deck: SlideDeck): string[] {
     if (block.type === 'image' && block.asset.kind === 'document-relative') paths.add(block.asset.relativePath);
     blockInlines(block).forEach((inlines) => inlineImagePaths(inlines, paths));
   });
+  deckPosterPaths(deck).forEach((path) => paths.add(path));
   return [...paths];
+}
+
+/** Video posters the deck references, for the PDF writer and the PPTX cover images. */
+export function deckPosterPaths(deck: SlideDeck): string[] {
+  return deck.slides.flatMap((slide) => slide.videos.flatMap((video) => (video.poster ? [video.poster] : [])));
 }
 
 /** Mermaid sources in the deck, de-duplicated. */

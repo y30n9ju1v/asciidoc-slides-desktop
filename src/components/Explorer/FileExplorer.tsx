@@ -1,44 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, FileText, Folder, Image as ImageIcon, File, RefreshCw } from 'lucide-react';
-import { readDir } from '@tauri-apps/plugin-fs';
-import { imageMimeType, joinPath } from '../../services/deckAssets';
+import { ChevronRight, FileText, Folder, Image as ImageIcon, File, RefreshCw, Film } from 'lucide-react';
+import { entryKind, listDirectory, type Entry, type EntryKind } from '../../services/explorerEntries';
 import { cn } from '@/lib/utils';
-
-interface Entry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-}
 
 interface FileExplorerProps {
   onRefresh?: () => void;
   root: string;
   activePath: string | null;
   onOpenDeck: (path: string) => void;
-  /** An image clicked in the tree (absolute path). */
-  onInsertImage: (path: string) => void;
+  /** An image or video clicked in the tree (absolute path). */
+  onInsertMedia: (path: string, kind: 'image' | 'video') => void;
 }
 
-const isDeck = (name: string) => /\.(adoc|asciidoc)$/i.test(name);
-
-/** Directories first, then files; hidden entries are skipped. */
-async function listDirectory(directory: string): Promise<Entry[]> {
-  const entries = await readDir(directory);
-  return entries
-    .filter((entry) => !entry.name.startsWith('.') && !entry.isSymlink)
-    .map((entry) => ({ name: entry.name, path: joinPath(directory, entry.name), isDirectory: entry.isDirectory }))
-    .sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name));
-}
-
-type EntryKind = 'directory' | 'deck' | 'image' | 'other';
-
-function entryKind(entry: Entry): EntryKind {
-  if (entry.isDirectory) return 'directory';
-  if (isDeck(entry.name)) return 'deck';
-  return imageMimeType(entry.name) !== null ? 'image' : 'other';
-}
-
-const KIND_ICONS = { directory: Folder, deck: FileText, image: ImageIcon, other: File } as const;
+const KIND_ICONS = { directory: Folder, deck: FileText, image: ImageIcon, video: Film, other: File } as const;
+const INSERT_TITLES: Partial<Record<EntryKind, string>> = {
+  image: 'Insert this image at the cursor',
+  video: 'Insert this video at the cursor',
+};
 
 interface NodeProps extends Omit<FileExplorerProps, 'root'> {
   entry: Entry;
@@ -55,7 +33,8 @@ function ExplorerNode({ entry, root, depth, version, ...actions }: NodeProps) {
   const onClick = {
     directory: () => setOpen((value) => !value),
     deck: () => actions.onOpenDeck(entry.path),
-    image: () => actions.onInsertImage(entry.path),
+    image: () => actions.onInsertMedia(entry.path, 'image'),
+    video: () => actions.onInsertMedia(entry.path, 'video'),
     other: () => undefined,
   }[kind];
 
@@ -64,7 +43,7 @@ function ExplorerNode({ entry, root, depth, version, ...actions }: NodeProps) {
       <button
         type="button"
         disabled={kind === 'other'}
-        title={kind === 'image' ? 'Insert this image at the cursor' : entry.name}
+        title={INSERT_TITLES[kind] ?? entry.name}
         aria-expanded={kind === 'directory' ? open : undefined}
         aria-current={active ? 'true' : undefined}
         onClick={onClick}
@@ -121,7 +100,7 @@ function DirectoryList({ directory, depth, ...rest }: Omit<NodeProps, 'entry'> &
   );
 }
 
-/** The open deck's folder as a tree: decks open on click, images insert an `image::` line. */
+/** The open deck's folder as a tree: decks open on click, images and videos insert a macro line. */
 export function FileExplorer({ root, onRefresh, ...actions }: FileExplorerProps) {
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((value) => value + 1), []);

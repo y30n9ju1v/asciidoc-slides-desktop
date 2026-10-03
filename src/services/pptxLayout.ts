@@ -1,7 +1,8 @@
 import type { SafeBlock, SafeInline, SafeListItem } from '../../packages/asciidoc-typst/typescript/src';
 import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from './safeDispatch';
 import { inlinesToPlainText } from './safeText';
-import type { BlockLayout } from './slideDeck';
+import type { BlockLayout, SlideVideo } from './slideDeck';
+import { slideItems } from './slideItems';
 import type { SlideTheme } from './slideThemes';
 
 /**
@@ -46,7 +47,8 @@ export type Frame =
   | { kind: 'code'; box: Box; code: string; fontSize: number }
   | { kind: 'table'; box: Box; rows: Run[][][]; hasHeader: boolean; fontSize: number }
   | { kind: 'image'; box: Box; source: ImageSource; alt: string }
-  | { kind: 'missingImage'; box: Box; alt: string };
+  | { kind: 'missingImage'; box: Box; alt: string }
+  | { kind: 'video'; box: Box; video: SlideVideo };
 
 export type ImageSource = { kind: 'file'; relativePath: string } | { kind: 'diagram'; code: string };
 
@@ -57,6 +59,7 @@ type Element = (
   | { kind: 'table'; rows: Run[][][]; hasHeader: boolean }
   | { kind: 'image'; source: ImageSource | null; alt: string }
   | { kind: 'columns'; columns: Element[][] }
+  | { kind: 'video'; video: SlideVideo }
 ) & { layout?: BlockLayout };
 
 const ADMONITION_LABELS: Record<string, string> = {
@@ -278,6 +281,7 @@ function measure(element: Element, boxWidth: number, theme: SlideTheme, baseScal
       }, 0);
     }
     case 'image':
+    case 'video':
       return 3.6 * Math.max(fontScale, 0.6);
     case 'columns': {
       const columnWidth = (width - GAP * 2 * (element.columns.length - 1)) / element.columns.length;
@@ -323,6 +327,9 @@ function frameFor(element: Element, box: Box, theme: SlideTheme, fontScale: numb
           : { kind: 'missingImage', box, alt: element.alt },
       );
       break;
+    case 'video':
+      frames.push({ kind: 'video', box, video: element.video });
+      break;
     case 'columns': {
       const count = element.columns.length;
       const width = (box.w - GAP * 2 * (count - 1)) / count;
@@ -345,10 +352,11 @@ function place(elements: Element[], box: Box, theme: SlideTheme, baseScale: numb
   const natural = elements.map((element) => measure(element, box.w, theme, baseScale));
   const total = natural.reduce((a, b) => a + b, 0) + GAP * Math.max(0, elements.length - 1);
   // Leftover vertical space goes to images, so a lone image fills the body.
-  const imageCount = elements.filter((element) => element.kind === 'image').length;
+  const isMedia = (element: Element) => element.kind === 'image' || element.kind === 'video';
+  const imageCount = elements.filter(isMedia).length;
   const spare = Math.max(0, box.h - total);
   elements.forEach((element, index) => {
-    const extra = element.kind === 'image' && imageCount > 0 ? spare / imageCount : 0;
+    const extra = isMedia(element) && imageCount > 0 ? spare / imageCount : 0;
     const { width, fontScale } = sized(element, box.w, baseScale);
     const frameBox = {
       x: alignedX(box, width, element.layout?.align),
@@ -371,16 +379,21 @@ export function layoutBlocks(
   box: Box,
   theme: SlideTheme,
   layouts: (BlockLayout | null)[] = [],
+  videos: SlideVideo[] = [],
 ): Frame[] {
   const elements: Element[] = [];
-  blocks.forEach((block, index) => {
-    const layout = layouts[index];
-    if (!layout) {
-      toElements([block], elements);
+  slideItems({ blocks, blockLayouts: layouts, videos }).forEach((item) => {
+    if (item.kind === 'video') {
+      elements.push({ kind: 'video', video: item.video, layout: item.video.layout ?? undefined });
+      return;
+    }
+    if (!item.layout) {
+      toElements([item.block], elements);
       return;
     }
     // A sized block gets its own elements, tagged so nothing merges into them.
-    toElements([block]).forEach((element) => elements.push({ ...element, layout }));
+    const layout = item.layout;
+    toElements([item.block]).forEach((element) => elements.push({ ...element, layout }));
   });
   let fontScale = 1;
   for (let attempt = 0; attempt < 12 && fontScale > MIN_FONT_SCALE; attempt += 1) {

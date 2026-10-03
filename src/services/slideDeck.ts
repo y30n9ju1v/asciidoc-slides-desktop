@@ -38,6 +38,25 @@ export interface BlockLayout {
   align: 'left' | 'center' | 'right' | null;
 }
 
+export type VideoSource = { kind: 'file'; relativePath: string } | { kind: 'youtube'; id: string };
+
+/**
+ * A `video::` block placed directly on a slide. SafeDocument has no video
+ * block, so videos travel beside `blocks` and are drawn before `blocks[at]`
+ * (`at === blocks.length` means after the last block).
+ */
+export interface SlideVideo {
+  at: number;
+  source: VideoSource;
+  /** Document-relative poster image (`poster=` for files, `cover=` for either). */
+  poster: string | null;
+  /** The block title (`.Title` above the macro). */
+  title: string | null;
+  /** Start offset in whole seconds. */
+  start: number | null;
+  layout: BlockLayout | null;
+}
+
 export interface Slide {
   layout: SlideLayout;
   title: string;
@@ -48,6 +67,7 @@ export interface Slide {
   blocks: SafeBlock[];
   /** Parallel to `blocks`: sizing for each top-level block, or null. */
   blockLayouts: (BlockLayout | null)[];
+  videos: SlideVideo[];
   /** Plain-text speaker notes from `[.notes]` blocks and `[NOTE.speaker]`. */
   notes: string;
   /** 1-based source line of the slide's heading, for editor navigation. */

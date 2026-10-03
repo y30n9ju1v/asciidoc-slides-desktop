@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { SlideDeck } from '../../services/slideDeck';
 import { SlideView } from './SlideView';
 import { usePresentationFocus } from '../../hooks/usePresentationFocus';
+import { handlePresentationControlKey } from '../../services/presentationInput';
 
 interface PresenterProps {
   deck: SlideDeck;
@@ -37,8 +38,29 @@ export function Presenter({ deck, startIndex, documentDir, onExit }: PresenterPr
     return () => void setFullscreen(false);
   }, []);
 
+  // Clicking into an embedded player (YouTube) moves keyboard focus into its
+  // frame, where the arrow keys and Escape no longer reach the presenter. The
+  // next click on the slide then only takes focus back instead of advancing.
+  const playerFocused = useRef(false);
+  useEffect(() => {
+    const onBlur = () => {
+      playerFocused.current = document.activeElement instanceof HTMLIFrameElement;
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, []);
+  const onClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (playerFocused.current) {
+      playerFocused.current = false;
+      presenterRef.current?.focus();
+      return;
+    }
+    go(event.clientX < window.innerWidth / 4 ? index - 1 : index + 1);
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (handlePresentationControlKey(event, presenterRef.current)) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.key === 'Escape') onExit(index);
@@ -49,7 +71,7 @@ export function Presenter({ deck, startIndex, documentDir, onExit }: PresenterPr
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [go, index, last, onExit]);
+  }, [go, index, last, onExit, presenterRef]);
 
   return createPortal(
     <div
@@ -60,10 +82,20 @@ export function Presenter({ deck, startIndex, documentDir, onExit }: PresenterPr
       aria-modal="true"
       aria-description="Use arrow keys to navigate. Press Escape to exit the presentation."
       aria-label={`Slide ${index + 1} of ${deck.slides.length}`}
-      onClick={(event) => go(event.clientX < window.innerWidth / 4 ? index - 1 : index + 1)}
+      onClick={onClick}
     >
+      <button
+        type="button"
+        className="presenter-exit"
+        onClick={(event) => {
+          event.stopPropagation();
+          onExit(index);
+        }}
+      >
+        Exit presentation (Esc)
+      </button>
       <div className="presenter-stage">
-        <SlideView deck={deck} index={index} documentDir={documentDir} />
+        <SlideView deck={deck} index={index} documentDir={documentDir} playback />
       </div>
     </div>,
     document.body,

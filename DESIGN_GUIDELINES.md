@@ -51,6 +51,8 @@
 - Asciidoctor AST는 공유 SafeDocument allow-list를 거쳐 `SlideDeck`으로 정규화한다. HTML·DOM·파일 핸들·실행 가능한 확장을 모델에 넣지 않는다.
 - 지원하지 않는 내용과 안전하지 않은 자산은 위치가 있는 진단으로 표시한다. 오류 진단은 내보내기를 막는다.
 - React의 텍스트 이스케이프, Mermaid strict 모드와 살균, KaTeX의 `trust: false`, CSP를 유지한다. 임의 외부 리소스나 인라인 스크립트를 허용하지 않는다.
+- 유일한 외부 리소스 예외는 발표 모드의 유튜브 재생이다. `frame-src`는 `https://www.youtube-nocookie.com`만 허용하고, 영상 ID는 11자 허용 문자로 검증하며, iframe은 `sandbox`(스크립트·같은 출처·프레젠테이션만)로 앱 창 이동과 팝업을 막는다. 편집 중 미리보기는 외부에 접속하지 않는다. 브라우저로 열기는 opener 권한을 `https://www.youtube.com/watch*`로 제한한다.
+- 로컬 동영상은 asset 프로토콜로 범위 단위 스트리밍한다. asset 스코프는 fs 스코프와 같은, 사용자가 고른 덱 폴더에만 부여한다. 두 스코프 모두 민감 경로 차단을 유지하며, 폴더 권한 부여 후에도 차단이 유지되는지 테스트한다.
 - WebView는 Rust에 검증 가능한 데이터만 전달한다. Typst 소스 생성과 이스케이프는 Rust가 담당한다.
 - 민감한 데이터, 키, 인증서, Team ID, 프로비저닝 프로필을 소스에 넣지 않는다.
 

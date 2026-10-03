@@ -12,7 +12,7 @@ use crate::safe_document::{
 };
 use crate::slide_deck::{
     BlockAlign, BlockLayout, HeroAlign, Slide, SlideDeck, SlideLayout, SlideStyle, SlideTheme,
-    StyleFont, TitleDecoration,
+    SlideVideo, StyleFont, TitleDecoration, VideoSource,
 };
 use crate::typst_font::{SANS_FONT_FAMILIES, SERIF_FONT_FAMILIES};
 use std::collections::HashSet;
@@ -343,7 +343,7 @@ impl<'a> Writer<'a> {
                 text(&byline.join("  ·  "))
             ));
         }
-        if !slide.blocks.is_empty() {
+        if !slide.blocks.is_empty() || !slide.videos.is_empty() {
             self.push(&format!(
                 "#v(1em)\n#text(size: {}pt)[\n",
                 self.theme.body_size * 0.85
@@ -363,7 +363,7 @@ impl<'a> Writer<'a> {
             self.theme.title_size * 1.25,
             text(&slide.title)
         ));
-        if !slide.blocks.is_empty() {
+        if !slide.blocks.is_empty() || !slide.videos.is_empty() {
             self.push(&format!("#text(size: {}pt)[\n", self.theme.body_size));
             self.top_blocks(slide)?;
             self.push("]\n");
@@ -426,20 +426,90 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
-    /// A slide's top-level blocks, each wrapped in its author-set sizing.
+    /// A slide's top-level blocks and videos in source order (videos go
+    /// before `blocks[at]`, as in `slideItems.ts`), each in its author-set sizing.
     fn top_blocks(&mut self, slide: &Slide) -> WriteResult {
+        let mut videos: Vec<&SlideVideo> = slide.videos.iter().collect();
+        videos.sort_by_key(|video| video.at);
+        let mut pending = videos.into_iter().peekable();
         for (index, block) in slide.blocks.iter().enumerate() {
-            match slide.block_layouts.get(index).and_then(Option::as_ref) {
-                Some(layout) => {
-                    let (open, close) = layout_wrapper(layout);
-                    self.push(&open);
-                    self.block(block, 1)?;
-                    self.push(&close);
-                }
-                None => self.block(block, 0)?,
+            while let Some(video) = pending.next_if(|video| video.at <= index) {
+                self.sized(video.layout.as_ref(), |writer| {
+                    writer.video(video);
+                    Ok(())
+                })?;
             }
+            let layout = slide.block_layouts.get(index).and_then(Option::as_ref);
+            self.sized(layout, |writer| {
+                writer.block(block, usize::from(layout.is_some()))
+            })?;
+        }
+        for video in pending {
+            self.sized(video.layout.as_ref(), |writer| {
+                writer.video(video);
+                Ok(())
+            })?;
         }
         Ok(())
+    }
+
+    fn sized(
+        &mut self,
+        layout: Option<&BlockLayout>,
+        write: impl FnOnce(&mut Self) -> WriteResult,
+    ) -> WriteResult {
+        let Some(layout) = layout else {
+            return write(self);
+        };
+        let (open, close) = layout_wrapper(layout);
+        self.push(&open);
+        write(self)?;
+        self.push(&close);
+        Ok(())
+    }
+
+    /// A 16:9 poster (or dark frame) with a play badge; YouTube videos link
+    /// to their watch page. PDF cannot play video.
+    fn video(&mut self, video: &SlideVideo) {
+        let poster = video
+            .poster
+            .as_deref()
+            .filter(|path| self.assets.contains(*path))
+            .map(|path| {
+                format!(
+                    "#place(image({}, width: 100%, height: 100%, fit: \"cover\"))\n",
+                    string_literal(path)
+                )
+            })
+            .unwrap_or_default();
+        let frame = format!(
+            "layout(size => {{ let w = calc.min(size.width, 7.46in); align(center, block(width: w, height: w * 9 / 16, fill: rgb(\"#111111\"), radius: 8pt, clip: true)[\n{poster}#place(center + horizon, box(width: 0.9in, height: 0.62in, radius: 10pt, fill: rgb(0, 0, 0, 160), align(center + horizon, polygon(fill: white, (0pt, 0pt), (0pt, 20pt), (17pt, 10pt)))))\n]) }})"
+        );
+        let label = video_label(video);
+        match youtube_watch_url(video) {
+            Some(url) => {
+                let url = string_literal(&url);
+                self.push(&format!("#link({url}, {frame})\n"));
+                self.push(&format!(
+                    "#align(center, link({url}, text(size: 0.7em, fill: {})[{}]))\n",
+                    self.theme.accent,
+                    text(
+                        &match video.title.as_deref().filter(|t| !t.trim().is_empty()) {
+                            Some(title) => format!("▶ {title} (YouTube)"),
+                            None => "▶ Watch on YouTube".to_string(),
+                        }
+                    )
+                ));
+            }
+            None => {
+                self.push(&format!("#{frame}\n"));
+                self.push(&format!(
+                    "#align(center, text(size: 0.7em, fill: {})[{}])\n",
+                    self.theme.muted,
+                    text(&format!("▶ {label}"))
+                ));
+            }
+        }
     }
 
     fn blocks(&mut self, blocks: &[SafeBlock], depth: usize) -> WriteResult {
@@ -765,6 +835,36 @@ impl<'a> Writer<'a> {
     }
 }
 
+fn is_youtube_id(id: &str) -> bool {
+    id.len() == 11
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// The watch page of a YouTube video; None for files or an invalid ID.
+fn youtube_watch_url(video: &SlideVideo) -> Option<String> {
+    let VideoSource::Youtube { id } = &video.source else {
+        return None;
+    };
+    let start = video.start.map(|s| format!("&t={s}s")).unwrap_or_default();
+    is_youtube_id(id).then(|| format!("https://www.youtube.com/watch?v={id}{start}"))
+}
+
+fn video_label(video: &SlideVideo) -> String {
+    if let Some(title) = video.title.as_deref().filter(|t| !t.trim().is_empty()) {
+        return title.to_string();
+    }
+    match &video.source {
+        VideoSource::File { relative_path } => relative_path
+            .rsplit('/')
+            .next()
+            .unwrap_or(relative_path)
+            .to_string(),
+        VideoSource::Youtube { .. } => "YouTube video".to_string(),
+    }
+}
+
 /// Opening/closing Typst for a sized block: alignment, a width-limited
 /// block, and a relative font size. Numbers are clamped, never free-form.
 fn layout_wrapper(layout: &BlockLayout) -> (String, String) {
@@ -884,6 +984,24 @@ mod tests {
             open,
             "#align(left, block(width: 100.00%)[\n#set text(size: 2.000em)\n"
         );
+    }
+
+    #[test]
+    fn youtube_links_use_only_validated_ids() {
+        let video = |id: &str| SlideVideo {
+            at: 0,
+            source: VideoSource::Youtube { id: id.into() },
+            poster: None,
+            title: None,
+            start: Some(30),
+            layout: None,
+        };
+        assert_eq!(
+            youtube_watch_url(&video("dQw4w9WgXcQ")).as_deref(),
+            Some("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30s")
+        );
+        assert_eq!(youtube_watch_url(&video("dQw4w9WgXc\"")), None);
+        assert_eq!(youtube_watch_url(&video("short")), None);
     }
 
     #[test]

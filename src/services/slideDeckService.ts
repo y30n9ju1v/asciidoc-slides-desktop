@@ -7,6 +7,7 @@ import {
   type SafeDiagnostic,
 } from '../../packages/asciidoc-typst/typescript/src';
 import { blockLayoutOf } from './blockLayout';
+import { parseVideoNode, placeVideo } from './slideVideo';
 import { blocksToPlainText } from './safeText';
 import {
   SLIDE_DECK_VERSION,
@@ -15,6 +16,7 @@ import {
   type SlideDeck,
   type SlideDeckMetadata,
   type SlideLayout,
+  type SlideVideo,
 } from './slideDeck';
 import { SLIDE_STYLE_ATTRIBUTE, slideStyleById } from './slideStyles';
 import { SLIDE_THEME_ATTRIBUTE, slideThemeById } from './slideThemes';
@@ -95,24 +97,42 @@ class DeckBuilder {
       title: draft.title,
       subtitle: draft.subtitle,
       hideTitle: draft.hideTitle,
-      blocks: body.map((entry) => entry.block),
-      blockLayouts: body.map((entry) => entry.layout),
+      blocks: body.blocks.map((entry) => entry.block),
+      blockLayouts: body.blocks.map((entry) => entry.layout),
+      videos: body.videos,
       notes,
       line: draft.line,
     });
   }
 
-  /** Normalizes each top-level node on its own so its sizing stays paired with its block. */
-  private normalizeBody(nodes: AsciidocNode[]): { block: SafeBlock; layout: BlockLayout | null }[] {
-    return nodes.flatMap((node) => {
+  /**
+   * Normalizes each top-level node on its own so its sizing stays paired with
+   * its block. `video::` nodes, which SafeDocument does not model, become
+   * slide videos positioned among those blocks.
+   */
+  private normalizeBody(nodes: AsciidocNode[]) {
+    const blocks: { block: SafeBlock; layout: BlockLayout | null }[] = [];
+    const videos: SlideVideo[] = [];
+    for (const node of nodes) {
       const layout = blockLayoutOf(rolesOf(node), node.attributes);
-      return this.normalize([node]).map((block) => ({ block, layout }));
-    });
+      if (node.context === 'video') {
+        const parsed = parseVideoNode(node);
+        if ('diagnostic' in parsed) this.diagnostics.push(parsed.diagnostic);
+        else {
+          videos.push(placeVideo(parsed.video, blocks.length, layout));
+          this.diagnostics.push(...parsed.diagnostics);
+        }
+        continue;
+      }
+      this.normalize([node]).forEach((block) => blocks.push({ block, layout }));
+    }
+    return { blocks, videos };
   }
 
   private normalize(nodes: AsciidocNode[]): SafeBlock[] {
     if (nodes.length === 0) return [];
-    const safe = normalizeSafeDocument({ blocks: nodes.map(prepareNode) }, { title: '', author: '', language: '' });
+    const prepared = nodes.map((node) => prepareNode(node, this.diagnostics));
+    const safe = normalizeSafeDocument({ blocks: prepared }, { title: '', author: '', language: '' });
     this.diagnostics.push(...safe.diagnostics);
     return safe.blocks;
   }
@@ -129,14 +149,41 @@ function rawSource(node: AsciidocNode): string {
  * quotes with their paragraphs' source joined, as the one-paragraph form
  * would have it. Object.create keeps every other Asciidoctor getter.
  */
-function prepareNode(node: AsciidocNode): AsciidocNode {
-  const children = node.blocks ?? [];
+function prepareNode(node: AsciidocNode, diagnostics: SafeDiagnostic[]): AsciidocNode {
+  if (node.context === 'dlist') return prepareDescriptionList(node, diagnostics);
+  const children = (node.blocks ?? [])
+    .filter((child) => keepNested(child, diagnostics))
+    .map((child) => prepareNode(child, diagnostics));
   if ((node.context === 'quote' || node.context === 'verse') && children.length > 0 && !rawSource(node).trim()) {
     const text = children.map(rawSource).filter(Boolean).join(' ');
     return Object.create(node, { source: { value: text }, blocks: { value: [] } });
   }
-  if (children.length > 0) node.blocks = children.map(prepareNode);
+  if (children.length > 0) {
+    node.blocks = children;
+  } else if (node.blocks?.length) {
+    return Object.create(node, { blocks: { value: [] } });
+  }
   return node;
+}
+
+function prepareDescriptionList(node: AsciidocNode, diagnostics: SafeDiagnostic[]): AsciidocNode {
+  const items = (node.items ?? []).map(([terms, description]) => [
+    terms.map((term) => prepareNode(term, diagnostics)),
+    prepareNode(description, diagnostics),
+  ]);
+  return Object.create(node, { items: { value: items } });
+}
+
+/** Videos play only when placed directly on a slide; nested ones are reported, not silently dropped. */
+function keepNested(child: AsciidocNode, diagnostics: SafeDiagnostic[]): boolean {
+  if (child.context !== 'video') return true;
+  diagnostics.push({
+    code: 'unsupported-block',
+    severity: 'warning',
+    message: 'Place videos directly on a slide, not inside columns, lists, or other blocks.',
+    location: { line: lineOf(child) },
+  });
+  return false;
 }
 
 /** An admonition note's own text is the note; a `[.notes]` block's children are. */

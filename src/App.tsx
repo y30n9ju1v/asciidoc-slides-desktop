@@ -121,14 +121,14 @@ export default function App() {
     [document_.text, document_.path, document_.documentDir],
   );
 
-  const insertImage = useCallback(
-    (path: string) => {
+  const insertMedia = useCallback(
+    (path: string, kind: 'image' | 'video') => {
       const relative = document_.documentDir ? pathRelativeTo(document_.documentDir, path) : null;
       if (relative === null) {
-        toast.info('Images must be in the deck’s folder or below it. Open or save a deck there first.');
+        toast.info('Images and videos must be in the deck’s folder or below it. Open or save a deck there first.');
         return;
       }
-      setInsertRequest((previous) => ({ text: `image::${relative}[]`, seq: (previous?.seq ?? 0) + 1 }));
+      setInsertRequest((previous) => ({ text: `${kind}::${relative}[]`, seq: (previous?.seq ?? 0) + 1 }));
     },
     [document_.documentDir],
   );
@@ -196,7 +196,7 @@ export default function App() {
               root={document_.explorerRoot ?? ''}
               activePath={document_.path}
               onOpenDeck={(path) => document_.openDeckFromTree(path).catch(reportError('Could not open the file'))}
-              onInsertImage={insertImage}
+              onInsertMedia={insertMedia}
               onRefresh={refreshImages}
             />
           </aside>

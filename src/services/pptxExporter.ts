@@ -1,6 +1,8 @@
 import type PptxGenJS from 'pptxgenjs';
 import { layoutBlocks, type Box, type Frame, type Paragraph, type Run } from './pptxLayout';
-import { blobToDataUrl, imageSize, loadImage, svgToPngDataUrl } from './imageStore';
+import { blobToDataUrl, blobToPngDataUrl, imageSize, loadImage, svgToPngDataUrl } from './imageStore';
+import { youtubePowerPointUrl } from './slideVideo';
+import { loadVideoData, type VideoData } from './videoStore';
 import { renderMermaidSvg } from './mermaidRenderer';
 import { SLIDE_HEIGHT_IN, SLIDE_WIDTH_IN, type Slide, type SlideDeck } from './slideDeck';
 import type { SlideStyle } from './slideStyles';
@@ -35,6 +37,7 @@ interface ExportContext {
   style: SlideStyle;
   fontFace: string;
   images: Map<string, LoadedImage | null>;
+  media: DeckMedia;
 }
 
 function runProps(run: Run, theme: SlideTheme): TextProps['options'] {
@@ -169,8 +172,31 @@ function addFrame(slide: PptxSlide, frame: Frame, context: ExportContext): void 
       const image = context.images.get(imageKey(frame));
       if (!image) return addMissingImage(slide, frame.box, frame.alt, context);
       slide.addImage({ data: image.data, altText: frame.alt, ...containBox(frame.box, image.width, image.height) });
+      return;
     }
+    case 'video':
+      return addVideoFrame(slide, frame, context);
   }
+}
+
+/**
+ * Local files are embedded and play in PowerPoint; YouTube becomes an online
+ * video. A file that could not be embedded shows why instead of vanishing.
+ */
+function addVideoFrame(slide: PptxSlide, frame: Extract<Frame, { kind: 'video' }>, context: ExportContext): void {
+  const { video } = frame;
+  const box = containBox(frame.box, 16, 9);
+  const cover = video.poster ? (context.media.posters.get(video.poster) ?? undefined) : undefined;
+  if (video.source.kind === 'youtube') {
+    slide.addMedia({ type: 'online', link: youtubePowerPointUrl(video.source.id, video.start), cover, ...box });
+    return;
+  }
+  const loaded = context.media.videos.get(video.source.relativePath);
+  if (!loaded || 'error' in loaded) {
+    const reason = loaded && 'error' in loaded ? ` (${loaded.error})` : '';
+    return addMissingImage(slide, box, `video ${video.source.relativePath}${reason}`, context);
+  }
+  slide.addMedia({ type: 'video', data: loaded.data, extn: loaded.extn, cover, ...box });
 }
 
 function addSlideNumber(slide: PptxSlide, color: string): void {
@@ -225,7 +251,7 @@ function addAccentBar(slide: PptxSlide, y: number, color: string, align: SlideSt
 }
 
 function addHeroBody(slide: PptxSlide, data: Slide, box: Box, hero: ExportContext): void {
-  layoutBlocks(data.blocks, box, hero.theme, data.blockLayouts).forEach((frame) =>
+  layoutBlocks(data.blocks, box, hero.theme, data.blockLayouts, data.videos).forEach((frame) =>
     addFrame(
       slide,
       frame.kind === 'text' && hero.style.heroAlign === 'center' ? { ...frame, align: 'center' } : frame,
@@ -252,7 +278,7 @@ function addTitleSlide(slide: PptxSlide, deck: SlideDeck, data: Slide, context: 
   }
   const byline = [deck.metadata.author, deck.metadata.date].filter(Boolean).join('  ·  ');
   if (byline) lines.push({ text: byline, options: { fontSize: theme.bodySize * 0.8, paraSpaceBefore: 18 } });
-  const hasBody = data.blocks.length > 0;
+  const hasBody = data.blocks.length > 0 || data.videos.length > 0;
   const textBox = { x: HERO_X, y: hasBody ? 1.2 : 0.8, w: HERO_W, h: hasBody ? 3.0 : SLIDE_HEIGHT_IN - 1.6 };
   if (!style.heroFill) addAccentBar(slide, hasBody ? 1.0 : 2.3, hero.bar, style.heroAlign);
   slide.addText(lines, {
@@ -274,7 +300,7 @@ function addSectionSlide(slide: PptxSlide, data: Slide, context: ExportContext):
   const { theme, style } = context;
   const hero = heroContext(context);
   slide.background = { color: hex(hero.background) };
-  const hasBody = data.blocks.length > 0;
+  const hasBody = data.blocks.length > 0 || data.videos.length > 0;
   const titleY = hasBody ? 1.6 : 2.9;
   addAccentBar(slide, titleY - 0.2, hero.bar, style.heroAlign);
   slide.addText(data.title, {
@@ -348,7 +374,9 @@ function addContentSlide(slide: PptxSlide, data: Slide, context: ExportContext):
   const showTitle = !data.hideTitle && data.title.length > 0;
   const top = showTitle ? addContentTitle(slide, data.title, context) : 0.45;
   const body: Box = { x: MARGIN_X, y: top, w: CONTENT_W, h: SLIDE_HEIGHT_IN - top - 0.6 };
-  layoutBlocks(data.blocks, body, theme, data.blockLayouts).forEach((frame) => addFrame(slide, frame, context));
+  layoutBlocks(data.blocks, body, theme, data.blockLayouts, data.videos).forEach((frame) =>
+    addFrame(slide, frame, context),
+  );
   addSlideNumber(slide, theme.muted);
 }
 
@@ -383,6 +411,29 @@ async function loadFrameImages(deck: SlideDeck, documentDir: string | null): Pro
   return images;
 }
 
+interface DeckMedia {
+  videos: Map<string, VideoData>;
+  /** PNG covers keyed by poster path. */
+  posters: Map<string, string | null>;
+}
+
+/** Reads each distinct video file and poster once. */
+async function loadDeckMedia(deck: SlideDeck, documentDir: string | null): Promise<DeckMedia> {
+  const media: DeckMedia = { videos: new Map(), posters: new Map() };
+  for (const video of deck.slides.flatMap((slide) => slide.videos)) {
+    if (video.source.kind === 'file' && !media.videos.has(video.source.relativePath)) {
+      media.videos.set(video.source.relativePath, await loadVideoData(documentDir, video.source.relativePath));
+      const loaded = media.videos.get(video.source.relativePath)!;
+      if ('error' in loaded) throw new Error(`Could not embed video ${video.source.relativePath}: ${loaded.error}`);
+    }
+    if (video.poster && !media.posters.has(video.poster)) {
+      const blob = await loadImage(documentDir, video.poster);
+      media.posters.set(video.poster, blob ? await blobToPngDataUrl(blob) : null);
+    }
+  }
+  return media;
+}
+
 /** Builds the .pptx bytes for a deck. */
 export async function buildPptx(deck: SlideDeck, documentDir: string | null): Promise<Uint8Array> {
   const { default: PptxGenJSClass } = await import('pptxgenjs');
@@ -398,6 +449,7 @@ export async function buildPptx(deck: SlideDeck, documentDir: string | null): Pr
     style: deck.style,
     fontFace,
     images: await loadFrameImages(deck, documentDir),
+    media: await loadDeckMedia(deck, documentDir),
   };
 
   for (const data of deck.slides) {

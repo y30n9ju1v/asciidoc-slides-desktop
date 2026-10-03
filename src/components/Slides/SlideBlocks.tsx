@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import hljs from 'highlight.js/lib/common';
 import katex from 'katex';
 import type {
@@ -8,11 +8,13 @@ import type {
   SafeListItem,
   SafeTableCell,
 } from '../../../packages/asciidoc-typst/typescript/src';
-import { imageCacheRevision, loadImageResult, subscribeImages } from '../../services/imageStore';
 import { renderMermaidSvg } from '../../services/mermaidRenderer';
 import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from '../../services/safeDispatch';
-import type { BlockLayout } from '../../services/slideDeck';
+import type { BlockLayout, Slide } from '../../services/slideDeck';
+import { slideItems } from '../../services/slideItems';
+import { SlideVideo } from './SlideVideo';
 import { useSlideAssets } from './SlideAssetsContext';
+import { useSlideImageUrl } from './useSlideImageUrl';
 
 /**
  * Renders SafeDocument blocks as React elements. Text is always React text
@@ -30,40 +32,6 @@ const ADMONITION_COLORS: Record<string, string> = {
   caution: '#dc2626',
 };
 
-interface ObjectUrlState {
-  url: string | null;
-  error: string | null;
-  loading: boolean;
-}
-
-function useObjectUrl(asset: SafeAssetRef): ObjectUrlState {
-  const revision = useSyncExternalStore(subscribeImages, imageCacheRevision);
-  const { documentDir } = useSlideAssets();
-  const relativePath = asset.kind === 'document-relative' ? asset.relativePath : null;
-  const [state, setState] = useState<{ key: string; url: string | null; error: string | null } | null>(null);
-  const key = `${revision}\u0000${documentDir}\u0000${relativePath}`;
-
-  useEffect(() => {
-    if (!relativePath) return;
-    let cancelled = false;
-    let url: string | null = null;
-    void loadImageResult(documentDir, relativePath).then((result) => {
-      if (cancelled) return;
-      url = result.blob ? URL.createObjectURL(result.blob) : null;
-      setState({ key, url, error: result.error });
-    });
-    return () => {
-      cancelled = true;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [documentDir, relativePath, key]);
-
-  if (!relativePath) return { url: null, error: 'remote images are not embedded', loading: false };
-  return state?.key === key
-    ? { url: state.url, error: state.error, loading: false }
-    : { url: null, error: null, loading: true };
-}
-
 function MissingImage({ alt, reason }: { alt: string; reason: string | null }) {
   return (
     <div className="slide-missing">
@@ -74,7 +42,7 @@ function MissingImage({ alt, reason }: { alt: string; reason: string | null }) {
 }
 
 function SlideImage({ asset, alt, caption }: { asset: SafeAssetRef; alt: string; caption: string | null }) {
-  const { url, error, loading } = useObjectUrl(asset);
+  const { url, error, loading } = useSlideImageUrl(asset);
   if (loading) return <div className="slide-figure" style={{ minHeight: 120 }} />;
   return (
     <figure className="slide-figure">
@@ -85,7 +53,7 @@ function SlideImage({ asset, alt, caption }: { asset: SafeAssetRef; alt: string;
 }
 
 function InlineImage({ asset, alt }: { asset: SafeAssetRef; alt: string }) {
-  const { url } = useObjectUrl(asset);
+  const { url } = useSlideImageUrl(asset);
   return url ? (
     <img src={url} alt={alt} style={{ display: 'inline', height: '1em', verticalAlign: '-0.15em' }} />
   ) : (
@@ -347,18 +315,19 @@ function layoutStyle(layout: BlockLayout): CSSProperties {
   };
 }
 
-/** A slide's top-level blocks, each wrapped in its author-set sizing. */
-export function SlideBlocks({ blocks, layouts }: { blocks: SafeBlock[]; layouts: (BlockLayout | null)[] }) {
+/** A slide's top-level blocks and videos in source order, each wrapped in its author-set sizing. */
+export function SlideBlocks({ slide }: { slide: Pick<Slide, 'blocks' | 'blockLayouts' | 'videos'> }) {
   return (
     <>
-      {blocks.map((block, index) => {
-        const layout = layouts[index];
+      {slideItems(slide).map((item, index) => {
+        const layout = item.kind === 'block' ? item.layout : item.video.layout;
+        const content = item.kind === 'block' ? <Block block={item.block} /> : <SlideVideo video={item.video} />;
         return layout ? (
           <div key={index} className="slide-sized" data-align={layout.align ?? undefined} style={layoutStyle(layout)}>
-            <Block block={block} />
+            {content}
           </div>
         ) : (
-          <Block key={index} block={block} />
+          <Fragment key={index}>{content}</Fragment>
         );
       })}
     </>

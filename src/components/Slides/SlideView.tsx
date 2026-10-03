@@ -79,6 +79,7 @@ function FitBody({ children }: { children: ReactNode }) {
 }
 
 function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; number: number }) {
+  const hasBody = slide.blocks.length + slide.videos.length > 0;
   if (slide.layout === 'title') {
     const byline = [deck.metadata.author, deck.metadata.date].filter(Boolean).join('  ·  ');
     return (
@@ -89,10 +90,10 @@ function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; 
         </div>
         {slide.subtitle && <div className="slide-subtitle">{slide.subtitle}</div>}
         {byline && <div className="slide-byline">{byline}</div>}
-        {slide.blocks.length > 0 && (
+        {hasBody && (
           <div className="slide-body-area" style={{ fontSize: '0.85em' }}>
             <div className="slide-body">
-              <SlideBlocks blocks={slide.blocks} layouts={slide.blockLayouts} />
+              <SlideBlocks slide={slide} />
             </div>
           </div>
         )}
@@ -106,10 +107,10 @@ function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; 
         <div className="slide-title" style={{ fontSize: `calc(var(--slide-title-size) * 1.25)` }}>
           {slide.title}
         </div>
-        {slide.blocks.length > 0 && (
+        {hasBody && (
           <div className="slide-body-area">
             <div className="slide-body">
-              <SlideBlocks blocks={slide.blocks} layouts={slide.blockLayouts} />
+              <SlideBlocks slide={slide} />
             </div>
           </div>
         )}
@@ -121,7 +122,7 @@ function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; 
     <>
       {!slide.hideTitle && slide.title && <div className="slide-title">{slide.title}</div>}
       <FitBody>
-        <SlideBlocks blocks={slide.blocks} layouts={slide.blockLayouts} />
+        <SlideBlocks slide={slide} />
       </FitBody>
       <div className="slide-number">{number}</div>
     </>
@@ -132,10 +133,12 @@ interface SlideViewProps {
   deck: SlideDeck;
   index: number;
   documentDir: string | null;
+  /** Presentation mode: videos play. Everywhere else they are still posters. */
+  playback?: boolean;
 }
 
 /** One slide, drawn at its logical 1280x720 size and scaled to the frame's width. */
-export function SlideView({ deck, index, documentDir }: SlideViewProps) {
+export function SlideView({ deck, index, documentDir, playback = false }: SlideViewProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
   const slide = deck.slides[index];
@@ -154,7 +157,10 @@ export function SlideView({ deck, index, documentDir }: SlideViewProps) {
   return (
     <div ref={frameRef} className="slide-frame">
       {slide && (
-        <SlideAssetsContext.Provider value={{ documentDir, theme: deck.theme }}>
+        <SlideAssetsContext.Provider
+          key={`${documentDir}\u0000${index}`}
+          value={{ documentDir, theme: deck.theme, playback }}
+        >
           <div
             className={`slide ${isHero ? 'slide-hero' : 'slide-content'}`}
             data-dark={isDarkSlideTheme(

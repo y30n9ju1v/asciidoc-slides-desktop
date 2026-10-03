@@ -20,7 +20,19 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' blob: asset: http://asset.localhost; frame-src https://www.youtube-nocookie.com",
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [],
+          "deny": [
+            "$HOME/.ssh/**",
+            "$HOME/.aws/**",
+            "$HOME/.gnupg/**",
+            "$HOME/Library/Keychains/**"
+          ]
+        }
+      }
     }
   },
   "bundle": {
@@ -29,7 +41,10 @@
     "targets": "all",
     "fileAssociations": [
       {
-        "ext": ["adoc", "asciidoc"],
+        "ext": [
+          "adoc",
+          "asciidoc"
+        ],
         "name": "AsciiDoc Slide Deck",
         "role": "Editor",
         "mimeType": "text/asciidoc",
@@ -41,6 +56,12 @@
       "hardenedRuntime": true,
       "minimumSystemVersion": "11.0"
     },
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }

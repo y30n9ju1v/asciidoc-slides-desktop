@@ -33,6 +33,23 @@ fn is_broad_directory(directory: &std::path::Path, home: Option<&std::path::Path
     directory.parent().is_none() || home.is_some_and(|home| home.starts_with(directory))
 }
 
+/// Grants a deck's folder to both the fs plugin (images, file tree) and the
+/// asset protocol, which streams local videos in ranges for playback instead
+/// of loading whole files into the WebView. Both scopes constrain access to
+/// the same folder; operation permissions are controlled by capabilities.
+fn grant_deck_folder<R: Runtime>(
+    app: &AppHandle<R>,
+    folder: &std::path::Path,
+) -> Result<(), String> {
+    use tauri::Manager;
+    app.fs_scope()
+        .allow_directory(folder, true)
+        .map_err(|error| error.to_string())?;
+    app.asset_protocol_scope()
+        .allow_directory(folder, true)
+        .map_err(|error| error.to_string())
+}
+
 /// A deck's images live next to it (`image::images/chart.png[]`), so a deck
 /// the user picked also grants read access to its own folder - unless that
 /// folder is the home folder or broader, where one file must not expose
@@ -50,9 +67,7 @@ fn grant_deck<R: Runtime>(
         .and_then(|p| std::path::Path::new(p).parent())
         .filter(|parent| !is_broad_directory(parent, home.as_deref()))
     {
-        app.fs_scope()
-            .allow_directory(parent, true)
-            .map_err(|error| error.to_string())?;
+        grant_deck_folder(app, parent)?;
     }
     Ok(path)
 }
@@ -120,9 +135,7 @@ pub async fn choose_deck_folder<R: Runtime>(
         return Ok(None);
     };
     let folder = path_from_selection(selected)?;
-    app.fs_scope()
-        .allow_directory(&folder, true)
-        .map_err(|error| error.to_string())?;
+    grant_deck_folder(&app, std::path::Path::new(&folder))?;
     let decks = list_decks(std::path::Path::new(&folder))?;
     Ok(Some(DeckFolder { folder, decks }))
 }
@@ -200,6 +213,28 @@ pub async fn choose_export_file<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn asset_scope_keeps_sensitive_paths_denied_after_folder_grant() {
+        use tauri::Manager;
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context.config_mut().app.security.asset_protocol.scope =
+            serde_json::from_value(config["app"]["security"]["assetProtocol"]["scope"].clone())
+                .unwrap();
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_fs::init())
+            .build(context)
+            .unwrap();
+        let home = app.path().home_dir().unwrap();
+        grant_deck_folder(app.handle(), &home).unwrap();
+        let scope = app.asset_protocol_scope();
+        assert!(scope.is_allowed(home.join("movie.mp4")));
+        for directory in [".ssh", ".aws", ".gnupg", "Library/Keychains"] {
+            assert!(!scope.is_allowed(home.join(directory).join("secret.mp4")));
+        }
+    }
 
     #[test]
     fn never_grants_home_or_broader_for_a_single_file() {

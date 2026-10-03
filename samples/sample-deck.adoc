@@ -96,6 +96,13 @@ graph LR
 [source,python,font-size=70%]
 ----
 
+== 동영상
+
+`video::` 로 유튜브나 로컬 동영상을 넣습니다. 발표 모드에서 재생됩니다.
+
+[width=70%]
+video::M7lc1UVf-VE[youtube]
+
 == 알림 블록
 
 NOTE: 슬라이드 내용이 넘치면 글자 크기가 자동으로 줄어듭니다.

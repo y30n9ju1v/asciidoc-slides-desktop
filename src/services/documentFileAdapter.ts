@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { readTextFile, writeFile } from '@tauri-apps/plugin-fs';
+import { readDir, readTextFile, writeFile } from '@tauri-apps/plugin-fs';
 import { ask } from '@tauri-apps/plugin-dialog';
 
 export function confirmExportWarnings(messages: string[]): Promise<boolean> {
@@ -51,6 +51,7 @@ export function chooseExportFile(
 }
 
 export const readDocumentText = readTextFile;
+export const readDirectory = readDir;
 
 /** Atomic save that refuses to overwrite a file changed on disk since `expected`. */
 export function writeDocumentText(path: string, content: string, expected: string | null = null): Promise<void> {

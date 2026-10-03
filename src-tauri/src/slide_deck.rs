@@ -43,8 +43,35 @@ pub struct Slide {
     /// Parallel to `blocks`; missing entries mean "no sizing".
     #[serde(default)]
     pub block_layouts: Vec<Option<BlockLayout>>,
+    /// Videos drawn before `blocks[at]`; see `slideItems.ts`.
+    #[serde(default)]
+    pub videos: Vec<SlideVideo>,
     #[allow(dead_code)]
     pub notes: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum VideoSource {
+    File {
+        #[serde(rename = "relativePath")]
+        relative_path: String,
+    },
+    /// Re-validated by the writer before it becomes part of a URL.
+    Youtube { id: String },
+}
+
+/// A video placed directly on a slide. PDF cannot play it, so the writer
+/// draws its poster with a play badge and, for YouTube, a link to it.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlideVideo {
+    pub at: usize,
+    pub source: VideoSource,
+    pub poster: Option<String>,
+    pub title: Option<String>,
+    pub start: Option<u32>,
+    pub layout: Option<BlockLayout>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -44,8 +44,8 @@ async function renderImage() {
   const deck = await parseSlideDeck('== Image\n\nimage::chart.png[Chart]');
   await act(async () =>
     root.render(
-      <SlideAssetsContext.Provider value={{ documentDir: '/deck', theme: deck.theme }}>
-        <SlideBlocks blocks={deck.slides[0].blocks} layouts={[]} />
+      <SlideAssetsContext.Provider value={{ documentDir: '/deck', theme: deck.theme, playback: false }}>
+        <SlideBlocks slide={deck.slides[0]} />
       </SlideAssetsContext.Provider>,
     ),
   );
@@ -81,7 +81,7 @@ async function renderTable(source: string) {
   container.append(style);
   const deck = await parseSlideDeck(source);
   const slide = deck.slides.find((item) => item.blocks.some((block) => block.type === 'table'))!;
-  await act(async () => root.render(<SlideBlocks blocks={slide.blocks} layouts={slide.blockLayouts} />));
+  await act(async () => root.render(<SlideBlocks slide={slide} />));
   // React replaces the root's contents on the first render.
   container.append(style);
   return container.querySelector('table')!;

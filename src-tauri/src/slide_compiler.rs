@@ -479,6 +479,52 @@ mod tests {
     }
 
     #[test]
+    fn compiles_slides_with_video_posters_and_links() {
+        let slides = format!(
+            r#"[
+              {{ "layout": "content", "title": "Videos", "subtitle": "", "hideTitle": false,
+                 "blocks": [{{ "type": "paragraph", "text": "", "inlines": [{{ "type": "text", "value": "Between" }}], {LOC} }}],
+                 "blockLayouts": [null],
+                 "videos": [
+                   {{ "at": 0, "source": {{ "kind": "file", "relativePath": "media/demo.mp4" }}, "poster": "media/missing.png", "title": "Demo", "start": 5, "layout": {{ "width": 0.5, "scale": null, "align": "center" }} }},
+                   {{ "at": 1, "source": {{ "kind": "youtube", "id": "dQw4w9WgXcQ" }}, "poster": null, "title": null, "start": 30, "layout": null }}
+                 ],
+                 "notes": "", "line": 1 }},
+              {{ "layout": "content", "title": "Only video", "subtitle": "", "hideTitle": false, "blocks": [],
+                 "videos": [{{ "at": 0, "source": {{ "kind": "youtube", "id": "bad\"id" }}, "poster": null, "title": null, "start": null, "layout": null }}],
+                 "notes": "", "line": 2 }}
+            ]"#
+        );
+        let parsed = parse_request(&request(&slides)).unwrap();
+        let source = write_slide_deck(&parsed.deck, &HashSet::new()).unwrap();
+        assert!(source.contains("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30s"));
+        assert!(
+            !source.contains("bad"),
+            "invalid IDs never reach the source"
+        );
+        assert!(source.find("Demo").unwrap() < source.find("Between").unwrap());
+        assert!(source.find("Between").unwrap() < source.find("watch?v=").unwrap());
+        let document = compile_document(source, &Vec::new()).unwrap();
+        assert_eq!(document.pages().len(), 2);
+    }
+
+    #[test]
+    fn compiles_video_only_hero_slides() {
+        for layout in ["title", "section"] {
+            let slides = format!(
+                r#"[{{"layout":"{layout}","title":"Video","subtitle":"","hideTitle":false,"blocks":[],"videos":[{{"at":0,"source":{{"kind":"youtube","id":"dQw4w9WgXcQ"}},"poster":null,"title":null,"start":null,"layout":null}}],"notes":"","line":1}}]"#
+            );
+            let parsed = parse_request(&request(&slides)).unwrap();
+            let source = write_slide_deck(&parsed.deck, &HashSet::new()).unwrap();
+            assert!(source.contains("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+            assert_eq!(
+                compile_document(source, &Vec::new()).unwrap().pages().len(),
+                1
+            );
+        }
+    }
+
+    #[test]
     fn compiles_an_empty_deck() {
         let parsed = parse_request(&request("[]")).unwrap();
         let source = write_slide_deck(&parsed.deck, &HashSet::new()).unwrap();

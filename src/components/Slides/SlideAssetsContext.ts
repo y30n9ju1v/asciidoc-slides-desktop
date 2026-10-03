@@ -5,6 +5,8 @@ import type { SlideTheme } from '../../services/slideThemes';
 export interface SlideAssets {
   documentDir: string | null;
   theme: SlideTheme;
+  /** True only in presentation mode: videos play there and stay still posters elsewhere. */
+  playback: boolean;
 }
 
 export const SlideAssetsContext = createContext<SlideAssets | null>(null);

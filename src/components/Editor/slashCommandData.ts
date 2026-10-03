@@ -115,6 +115,20 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     insertText: 'image::${1:path/to/image.png}[${2:Alt text}]\n$0',
   },
   {
+    command: 'video',
+    detail: 'Video file',
+    documentation:
+      'Insert a local video (next to the deck). Plays in presentation mode and in PowerPoint; PDF shows the poster with a link.',
+    insertText: 'video::${1:media/clip.mp4}[poster=${2:media/clip.png}]\n$0',
+  },
+  {
+    command: 'youtube',
+    detail: 'YouTube video',
+    documentation:
+      'Insert a YouTube video by ID or link. Plays in presentation mode (click to start) and in recent PowerPoint; PDF links to it.',
+    insertText: 'video::${1:VIDEO_ID}[youtube${2:,start=0}]\n$0',
+  },
+  {
     command: 'quote',
     detail: 'Quote block',
     documentation: 'Insert an attributed quote block.',
