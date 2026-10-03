@@ -12,11 +12,6 @@ export function confirmExportWarnings(messages: string[]): Promise<boolean> {
   });
 }
 
-/** Tauri boundary for deck files and native pickers. Pickers grant fs scope in Rust. */
-export function chooseDocumentToOpen(): Promise<string | null> {
-  return invoke('choose_document_to_open');
-}
-
 export interface DeckFolder {
   folder: string;
   /** Absolute paths of the `.adoc`/`.asciidoc` files directly inside `folder`. */
@@ -28,7 +23,7 @@ export function chooseDeckFolder(): Promise<DeckFolder | null> {
   return invoke('choose_deck_folder');
 }
 
-/** The deck the app was launched with, if any (granted once by Rust). */
+/** Launch deck, returned only after its containing folder is selected in the native picker. */
 export function takeLaunchDocument(): Promise<string | null> {
   return invoke('take_launch_document');
 }
@@ -38,6 +33,7 @@ export function onLaunchDocument(handler: () => void): Promise<() => void> {
   return listen('launch-document', handler);
 }
 
+/** Choose a name, then authorize its containing folder; cancellation returns null. */
 export function chooseDocumentSavePath(): Promise<string | null> {
   return invoke('choose_document_save_path');
 }

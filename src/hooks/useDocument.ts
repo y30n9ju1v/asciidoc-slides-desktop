@@ -4,7 +4,6 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   chooseDeckFolder,
   chooseDocumentSavePath,
-  chooseDocumentToOpen,
   onLaunchDocument,
   readDocumentText,
   takeLaunchDocument,
@@ -90,13 +89,6 @@ export function useDocument() {
     },
     [isCurrent, commit],
   );
-
-  const openDocument = useCallback(async () => {
-    const ticket = await beginTransition();
-    if (!ticket) return;
-    const path = await chooseDocumentToOpen();
-    if (path && isCurrent(ticket)) await loadPath(path, ticket);
-  }, [beginTransition, isCurrent, loadPath]);
 
   /** Every UI entry point checks the document again, including the folder's deck picker. */
   const openDeckFromTree = useCallback(
@@ -242,7 +234,6 @@ export function useDocument() {
     isDirty,
     setText,
     newDocument,
-    openDocument,
     openFolder,
     openPath: openDeckFromTree,
     save,

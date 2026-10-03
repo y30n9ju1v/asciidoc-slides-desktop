@@ -134,7 +134,8 @@ export default function App() {
     [document_],
   );
 
-  const { newDocument, openDocument, save, saveAs } = document_;
+  const { newDocument, openFolder, save, saveAs } = document_;
+  const openDeckFolder = useCallback(() => openFolder().then(setFolderDecks), [openFolder]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (presenting) return;
@@ -147,7 +148,7 @@ export default function App() {
       const key = event.key.toLowerCase();
       const actions: Record<string, () => Promise<unknown>> = {
         s: event.shiftKey ? saveAs : save,
-        o: openDocument,
+        o: openDeckFolder,
         n: newDocument,
       };
       const action = actions[key];
@@ -157,7 +158,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deck, isStale, presenting, newDocument, openDocument, save, saveAs]);
+  }, [deck, isStale, presenting, newDocument, openDeckFolder, save, saveAs]);
 
   return (
     <div className="app-container">
@@ -176,8 +177,7 @@ export default function App() {
         explorerOpen={preferences.explorerOpen}
         onExplorerToggle={() => updatePreferences({ explorerOpen: !preferences.explorerOpen })}
         onNew={() => newDocument().catch(reportError('Could not create a deck'))}
-        onOpen={() => openDocument().catch(reportError('Could not open the file'))}
-        onOpenFolder={() => document_.openFolder().then(setFolderDecks, reportError('Could not open the folder'))}
+        onOpenFolder={() => openDeckFolder().catch(reportError('Could not open the folder'))}
         onSave={() => save().catch(reportError('Could not save'))}
         onSaveAs={() => saveAs().catch(reportError('Could not save'))}
         onThemeChange={(id: SlideThemeId) => setHeaderAttribute(SLIDE_THEME_ATTRIBUTE, id)}

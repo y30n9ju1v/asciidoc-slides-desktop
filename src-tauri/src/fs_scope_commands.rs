@@ -27,12 +27,6 @@ fn grant_file<R: Runtime>(
     Ok(Some(path))
 }
 
-/// True for folders too broad to grant just because one file in them was
-/// opened: the filesystem root, the home folder, or any ancestor of it.
-fn is_broad_directory(directory: &std::path::Path, home: Option<&std::path::Path>) -> bool {
-    directory.parent().is_none() || home.is_some_and(|home| home.starts_with(directory))
-}
-
 /// Grants a deck's folder to both the fs plugin (images, file tree) and the
 /// asset protocol, which streams local videos in ranges for playback instead
 /// of loading whole files into the WebView. Both scopes constrain access to
@@ -50,39 +44,41 @@ fn grant_deck_folder<R: Runtime>(
         .map_err(|error| error.to_string())
 }
 
-/// A deck's images live next to it (`image::images/chart.png[]`), so a deck
-/// the user picked also grants read access to its own folder - unless that
-/// folder is the home folder or broader, where one file must not expose
-/// everything under it ("Open folder" remains the explicit way to do that).
-/// Asset reads re-check containment in that folder (see slide_compiler.rs).
+/// A selected file alone does not grant OS permission for atomic sibling writes.
+/// Require its actual parent through the native folder picker before returning it.
 fn grant_deck<R: Runtime>(
     app: &AppHandle<R>,
     selected: Option<FilePath>,
 ) -> Result<Option<String>, String> {
-    use tauri::Manager;
-    let path = grant_file(app, selected)?;
-    let home = app.path().home_dir().ok();
-    if let Some(parent) = path
-        .as_deref()
-        .and_then(|p| std::path::Path::new(p).parent())
-        .filter(|parent| !is_broad_directory(parent, home.as_deref()))
-    {
-        grant_deck_folder(app, parent)?;
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = path_from_selection(selected)?;
+    let parent = std::path::Path::new(&path)
+        .parent()
+        .ok_or("Missing deck folder")?;
+    let Some(selected_folder) = app
+        .dialog()
+        .file()
+        .set_title("Select the deck's containing folder to enable editing and saving")
+        .set_directory(parent)
+        .blocking_pick_folder()
+    else {
+        return Ok(None);
+    };
+    let folder = path_from_selection(selected_folder)?;
+    if !same_folder(parent, std::path::Path::new(&folder))? {
+        return Err(
+            "Select the folder containing the deck. The document was not opened or saved.".into(),
+        );
     }
-    Ok(path)
+    grant_deck_folder(app, std::path::Path::new(&folder))?;
+    Ok(Some(path))
 }
 
-#[command]
-pub async fn choose_document_to_open<R: Runtime>(
-    app: AppHandle<R>,
-) -> Result<Option<String>, String> {
-    grant_deck(
-        &app,
-        app.dialog()
-            .file()
-            .add_filter("AsciiDoc", &["adoc", "asciidoc", "txt"])
-            .blocking_pick_file(),
-    )
+fn same_folder(expected: &std::path::Path, selected: &std::path::Path) -> Result<bool, String> {
+    Ok(expected.canonicalize().map_err(|error| error.to_string())?
+        == selected.canonicalize().map_err(|error| error.to_string())?)
 }
 
 #[command]
@@ -178,8 +174,8 @@ impl LaunchDocument {
     }
 }
 
-/// Returns the launch deck once, granting it and its folder like a picked deck:
-/// the user chose it by launching the app with it.
+/// Returns the launch deck once, after the user selects its containing folder.
+/// Finder grants only the file, not permission to create atomic-save siblings.
 #[command]
 pub async fn take_launch_document<R: Runtime>(
     app: AppHandle<R>,
@@ -237,19 +233,11 @@ mod tests {
     }
 
     #[test]
-    fn never_grants_home_or_broader_for_a_single_file() {
-        let home = std::path::Path::new("/Users/me");
-        assert!(is_broad_directory(std::path::Path::new("/"), Some(home)));
-        assert!(is_broad_directory(
-            std::path::Path::new("/Users"),
-            Some(home)
-        ));
-        assert!(is_broad_directory(home, Some(home)));
-        assert!(!is_broad_directory(&home.join("talks"), Some(home)));
-        assert!(!is_broad_directory(
-            std::path::Path::new("/Volumes/usb/talks"),
-            Some(home)
-        ));
+    fn requires_the_exact_containing_folder() {
+        let root = std::env::temp_dir();
+        assert!(same_folder(&root, &root).unwrap());
+        assert!(!same_folder(&root, root.parent().unwrap()).unwrap());
+        assert!(same_folder(&root, &root.join("nonexistent-slides-folder")).is_err());
     }
 
     #[test]

@@ -31,6 +31,39 @@ beforeEach(() => {
 });
 
 describe('document operation ownership', () => {
+  it('opens the only deck in a selected folder', async () => {
+    const hook = await renderHook(useDocument);
+    vi.mocked(files.chooseDeckFolder).mockResolvedValue({ folder: '/talks', decks: ['/talks/one.adoc'] });
+    await act(async () => expect(await hook.current.openFolder()).toEqual([]));
+    expect(hook.current).toMatchObject({ path: '/talks/one.adoc', explorerRoot: '/talks' });
+  });
+
+  it('returns multiple decks for selection without replacing the current document', async () => {
+    const hook = await renderHook(useDocument);
+    const decks = ['/talks/one.adoc', '/talks/two.adoc'];
+    vi.mocked(files.chooseDeckFolder).mockResolvedValue({ folder: '/talks', decks });
+    await act(async () => expect(await hook.current.openFolder()).toEqual(decks));
+    expect(hook.current.path).toBeNull();
+    expect(files.readDocumentText).not.toHaveBeenCalled();
+  });
+
+  it('keeps the document when folder selection is cancelled', async () => {
+    const hook = await renderHook(useDocument);
+    await act(async () => hook.current.setText('keep edits'));
+    vi.mocked(files.chooseDeckFolder).mockResolvedValue(null);
+    await act(async () => expect(await hook.current.openFolder()).toEqual([]));
+    expect(hook.current).toMatchObject({ text: 'keep edits', isDirty: true, explorerRoot: null });
+  });
+
+  it('does not write when Save As folder authorization is cancelled', async () => {
+    const hook = await renderHook(useDocument);
+    await act(async () => hook.current.setText('keep edits'));
+    vi.mocked(files.chooseDocumentSavePath).mockResolvedValue(null);
+    await act(async () => expect(await hook.current.saveAs()).toBe(false));
+    expect(files.writeDocumentText).not.toHaveBeenCalled();
+    expect(hook.current).toMatchObject({ text: 'keep edits', isDirty: true, path: null });
+  });
+
   it('ignores a folder picker result after a newer document operation', async () => {
     const hook = await renderHook(useDocument);
     const picker = deferred<files.DeckFolder | null>();

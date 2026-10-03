@@ -44,7 +44,6 @@ interface AppHeaderProps {
   explorerOpen: boolean;
   onExplorerToggle: () => void;
   onNew: () => void;
-  onOpen: () => void;
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -87,22 +86,9 @@ export function AppHeader(props: AppHeaderProps) {
       <IconButton label={`New deck (${MOD}N)`} onClick={props.onNew}>
         <FilePlus2 />
       </IconButton>
-      <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open">
-                <FolderOpen />
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Open</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onSelect={props.onOpen}>Open file… ({MOD}O)</DropdownMenuItem>
-          <DropdownMenuItem onSelect={props.onOpenFolder}>Open folder…</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <IconButton label={`Open folder (${MOD}O)`} onClick={props.onOpenFolder}>
+        <FolderOpen />
+      </IconButton>
       <DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
