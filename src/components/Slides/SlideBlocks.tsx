@@ -9,6 +9,7 @@ import type {
   SafeTableCell,
 } from '../../../packages/asciidoc-typst/typescript/src';
 import { renderMermaidSvg } from '../../services/mermaidRenderer';
+import { splitHardBreaks } from '../../services/hardBreaks';
 import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from '../../services/safeDispatch';
 import type { BlockLayout, Slide } from '../../services/slideDeck';
 import { slideItems } from '../../services/slideItems';
@@ -147,6 +148,22 @@ export function Inlines({ inlines }: { inlines: SafeInline[] }) {
   );
 }
 
+/** Plain text where hard breaks become <br>; ordinary newlines stay soft wraps. */
+function TextWithBreaks({ value }: { value: string }) {
+  const parts = splitHardBreaks(value);
+  if (parts.length === 1) return <>{value}</>;
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && <br />}
+          {part}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 function Inline({ inline }: { inline: SafeInline }) {
   return dispatchInline(INLINE_VIEWS, inline, undefined);
 }
@@ -167,7 +184,7 @@ const noteView = (inline: { children: SafeInline[] }): ReactNode => (
 );
 
 const INLINE_VIEWS: InlineHandlers<ReactNode> = {
-  text: (inline) => inline.value,
+  text: (inline) => <TextWithBreaks value={inline.value} />,
   strong: wrap('strong'),
   emphasis: wrap('em'),
   superscript: wrap('sup'),

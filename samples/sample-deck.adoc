@@ -39,6 +39,10 @@ AsciiDoc으로 쓰고, PPTX와 PDF로 출판합니다.
 
 링크도 그대로 동작합니다: https://asciidoc.org[AsciiDoc 공식 사이트]
 
+줄 끝에 공백과 +를 쓰면 같은 문단 안에서 줄이 바뀝니다. +
+이 줄은 새 줄에서 시작하고, +
+다음 줄도 같은 문단입니다.
+
 [quote, Antoine de Saint-Exupéry]
 ____
 완벽함이란 더할 것이 없을 때가 아니라, 뺄 것이 없을 때 완성된다.

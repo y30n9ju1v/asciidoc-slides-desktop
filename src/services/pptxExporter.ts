@@ -51,6 +51,7 @@ function runProps(run: Run, theme: SlideTheme): TextProps['options'] {
     fontFace: run.code ? MONO_FACE : undefined,
     color: run.muted ? hex(theme.muted) : run.color === 'accent' ? hex(theme.accent) : undefined,
     hyperlink: run.link ? { url: run.link } : undefined,
+    softBreakBefore: run.breakBefore,
   };
 }
 

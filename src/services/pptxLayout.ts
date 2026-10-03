@@ -2,6 +2,7 @@ import type { SafeBlock, SafeInline, SafeListItem } from '../../packages/asciido
 import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from './safeDispatch';
 import { inlinesToPlainText } from './safeText';
 import type { BlockLayout, SlideVideo } from './slideDeck';
+import { HARD_BREAK, splitHardBreaks } from './hardBreaks';
 import { slideItems } from './slideItems';
 import { ADMONITION_LABELS, isSafeLinkTarget, splitIntoColumns } from './slideRules';
 import type { SlideTheme } from './slideThemes';
@@ -30,6 +31,8 @@ export interface Run {
   link?: string;
   muted?: boolean;
   color?: string;
+  /** Starts on a new line inside the same paragraph (a hard break). */
+  breakBefore?: boolean;
 }
 
 export interface Paragraph {
@@ -82,7 +85,12 @@ const noteRun = (inline: { children: SafeInline[] }, style: RunStyle): Run[] => 
 ];
 
 const INLINE_RUNS: InlineHandlers<Run[], RunStyle> = {
-  text: (inline, style) => [{ text: inline.value.replace(/\s*\n\s*/g, ' '), ...style }],
+  text: (inline, style) =>
+    splitHardBreaks(inline.value).map((part, index) => ({
+      text: part.replace(/\s*\n\s*/g, ' '),
+      ...style,
+      ...(index > 0 ? { breakBefore: true } : {}),
+    })),
   code: (inline, style) => [{ text: inline.value, code: true, ...style }],
   math: (inline, style) => [{ text: inline.tex, italic: true, ...style }],
   strong: styled({ bold: true }),
@@ -230,8 +238,12 @@ function estimateLines(text: string, fontSize: number, width: number): number {
   return Math.max(1, Math.ceil(units / perLine));
 }
 
-function paragraphText(paragraph: Paragraph): string {
-  return paragraph.runs.map((run) => run.text).join('');
+/** Text of a paragraph's visual lines: hard breaks start a new segment. */
+function paragraphLines(paragraph: Paragraph): string[] {
+  return paragraph.runs
+    .map((run) => (run.breakBefore ? HARD_BREAK : '') + run.text)
+    .join('')
+    .split(HARD_BREAK);
 }
 
 /** Natural height of an element at `fontScale`, in inches. */
@@ -247,7 +259,10 @@ function measure(element: Element, boxWidth: number, theme: SlideTheme, baseScal
       return element.paragraphs.reduce((sum, paragraph) => {
         const size = theme.bodySize * fontScale * paragraph.scale;
         const indent = paragraph.level * 0.4 + (paragraph.indent ?? 0) + (paragraph.bullet ? 0.35 : 0);
-        const lines = estimateLines(paragraphText(paragraph), size, width - indent);
+        const lines = paragraphLines(paragraph).reduce(
+          (total, segment) => total + estimateLines(segment, size, width - indent),
+          0,
+        );
         return sum + lines * pointsToInches(size * LINE_HEIGHT) + pointsToInches(size * 0.45);
       }, 0.1);
     case 'code': {

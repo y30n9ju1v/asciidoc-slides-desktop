@@ -9,6 +9,7 @@ import {
 } from '../../packages/asciidoc-typst/typescript/src';
 import { blockLayoutOf } from './blockLayout';
 import { expandCodeCallouts, groupCodeCallouts } from './codeCallouts';
+import { expandHardBreaks } from './hardBreaks';
 import { resolveSlideChrome, type ChromeSettings } from './slideChrome';
 import { parseVideoNode, placeVideo } from './slideVideo';
 import { blocksToPlainText } from './safeText';
@@ -151,7 +152,7 @@ class DeckBuilder {
     const prepared = nodes.map((node) => prepareNode(node, this.diagnostics));
     const safe = normalizeSafeDocument({ blocks: prepared }, { title: '', author: '', language: '' });
     this.diagnostics.push(...safe.diagnostics);
-    return expandCodeCallouts(safe.blocks);
+    return expandHardBreaks(expandCodeCallouts(safe.blocks));
   }
 }
 

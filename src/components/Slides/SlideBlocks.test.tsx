@@ -70,6 +70,20 @@ it('renders code callout markers and formatted explanations with line highlighti
   expect(container.querySelector('strong')?.textContent).toBe('hello');
 });
 
+it('renders a hard break as <br> and keeps soft newlines inline', async () => {
+  const deck = await parseSlideDeck('== S\n\n첫 줄 +\n둘째 줄\n셋째 줄');
+  await act(async () =>
+    root.render(
+      <SlideAssetsContext.Provider value={{ documentDir: null, theme: deck.theme, playback: false }}>
+        <SlideBlocks slide={deck.slides[0]} />
+      </SlideAssetsContext.Provider>,
+    ),
+  );
+  const paragraph = container.querySelector('p')!;
+  expect(paragraph.querySelectorAll('br')).toHaveLength(1);
+  expect(paragraph.innerHTML).toBe('첫 줄<br>둘째 줄\n셋째 줄');
+});
+
 it('updates a mounted image after invalidation and releases its old URL', async () => {
   vi.mocked(readFile)
     .mockResolvedValueOnce(new Uint8Array([1]))

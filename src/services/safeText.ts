@@ -1,11 +1,12 @@
 import type { SafeBlock, SafeInline } from '../../packages/asciidoc-typst/typescript/src';
+import { splitHardBreaks } from './hardBreaks';
 import { dispatchBlock, dispatchInline, type BlockHandlers, type InlineHandlers } from './safeDispatch';
 
 const children = (inline: { children: SafeInline[] }) => inlinesToPlainText(inline.children);
 const note = (inline: { children: SafeInline[] }) => ` (${inlinesToPlainText(inline.children)})`;
 
 const INLINE_TEXT: InlineHandlers<string> = {
-  text: (inline) => inline.value,
+  text: (inline) => splitHardBreaks(inline.value).join('\n'),
   code: (inline) => inline.value,
   math: (inline) => inline.tex,
   inlineImage: (inline) => inline.alt,

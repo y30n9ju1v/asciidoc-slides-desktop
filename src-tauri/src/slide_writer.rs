@@ -21,6 +21,8 @@ use std::collections::HashSet;
 
 /// Nesting deeper than this is refused rather than recursed into.
 const MAX_DEPTH: usize = 48;
+/// U+2028 inside text values marks a forced line break; mirrors `hardBreaks.ts`.
+const HARD_BREAK: char = '\u{2028}';
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct WriteError(pub String);
@@ -862,9 +864,19 @@ impl<'a> Writer<'a> {
         Ok(())
     }
 
+    /// Text where U+2028 is a hard break (see `hardBreaks.ts`); newlines stay soft wraps.
+    fn text_with_breaks(&mut self, value: &str) {
+        for (index, part) in value.split(HARD_BREAK).enumerate() {
+            if index > 0 {
+                self.push("#linebreak()");
+            }
+            self.push(&text(part));
+        }
+    }
+
     fn inline(&mut self, inline: &SafeInline, depth: usize) -> WriteResult {
         match inline {
-            SafeInline::Text { value } => self.push(&text(value)),
+            SafeInline::Text { value } => self.text_with_breaks(value),
             SafeInline::Strong { children } => self.wrapped("strong", children, depth)?,
             SafeInline::Emphasis { children } => self.wrapped("emph", children, depth)?,
             SafeInline::Superscript { children } => self.wrapped("super", children, depth)?,

@@ -716,6 +716,26 @@ mod tests {
     }
 
     #[test]
+    fn compiles_hard_breaks_as_line_breaks() {
+        let slides = format!(
+            r#"[{{"layout":"content","title":"Breaks","subtitle":"","hideTitle":false,
+              "blocks":[{{"type":"paragraph","text":"","inlines":[{{"type":"text","value":"first\u2028second\u2028"}},{{"type":"strong","children":[{{"type":"text","value":"third"}}]}}],{LOC}}}],
+              "videos":[],"notes":"","line":1}}]"#
+        );
+        let parsed = parse_request(&request(&slides)).unwrap();
+        let source = write_slide_deck(&parsed.deck, &HashSet::new()).unwrap();
+        assert_eq!(source.matches("#linebreak()").count(), 2);
+        assert!(
+            !source.contains('\u{2028}'),
+            "the marker never reaches Typst source"
+        );
+        assert_eq!(
+            compile_document(source, &Vec::new()).unwrap().pages().len(),
+            1
+        );
+    }
+
+    #[test]
     fn compiles_an_empty_deck() {
         let parsed = parse_request(&request("[]")).unwrap();
         let source = write_slide_deck(&parsed.deck, &HashSet::new()).unwrap();
