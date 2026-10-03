@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { clampEditorFontSize, DEFAULT_EDITOR_FONT_SIZE } from '../services/editorPreferences';
 
 export type ColorMode = 'dark' | 'light';
 
@@ -15,7 +16,7 @@ const STORAGE_KEY = 'asciidoc-slides:preferences';
 const DEFAULTS: AppPreferences = {
   colorMode: 'dark',
   vimMode: false,
-  editorFontSize: 14,
+  editorFontSize: DEFAULT_EDITOR_FONT_SIZE,
   editorFraction: 0.42,
   explorerOpen: true,
 };
@@ -26,10 +27,7 @@ function readPreferences(): AppPreferences {
     return {
       colorMode: stored.colorMode === 'light' ? 'light' : 'dark',
       vimMode: stored.vimMode === true,
-      editorFontSize:
-        typeof stored.editorFontSize === 'number'
-          ? Math.min(24, Math.max(10, stored.editorFontSize))
-          : DEFAULTS.editorFontSize,
+      editorFontSize: clampEditorFontSize(stored.editorFontSize),
       editorFraction:
         typeof stored.editorFraction === 'number'
           ? Math.min(0.75, Math.max(0.2, stored.editorFraction))
@@ -55,7 +53,10 @@ export function useAppPreferences() {
   }, [preferences]);
 
   const update = useCallback((patch: Partial<AppPreferences>) => {
-    setPreferences((current) => ({ ...current, ...patch }));
+    setPreferences((current) => {
+      const next = { ...current, ...patch };
+      return { ...next, editorFontSize: clampEditorFontSize(next.editorFontSize) };
+    });
   }, []);
 
   return [preferences, update] as const;

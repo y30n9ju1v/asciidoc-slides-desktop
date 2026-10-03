@@ -9,7 +9,7 @@ restyle, or remove these regions without an explicit request from the owner:
 
 - **Header toolbar** (`src/components/Layout/AppHeader.tsx`): logo, file-tree toggle, New / Open /
   Save icon buttons, file name with unsaved dot and slide count, then on the right the style and
-  theme selects, Export dropdown, Present button, light/dark toggle, and editor settings.
+  theme selects, Export dropdown, Present button, light/dark toggle, editor text size (− / +), and editor settings.
 - **Workspace** (`src/App.tsx`): collapsible file tree (the deck's folder), Monaco editor,
   draggable resizer, slide preview on the right.
 - **Preview** (`src/components/Slides/SlidePreview.tsx`): large 16:9 slide stage, a small

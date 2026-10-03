@@ -175,6 +175,8 @@ export default function App() {
         canPresent={!isStale && summary.slideCount > 0}
         colorMode={preferences.colorMode}
         vimMode={preferences.vimMode}
+        editorFontSize={preferences.editorFontSize}
+        onEditorFontSizeChange={(editorFontSize) => updatePreferences({ editorFontSize })}
         explorerOpen={preferences.explorerOpen}
         onExplorerToggle={() => updatePreferences({ explorerOpen: !preferences.explorerOpen })}
         onNew={() => newDocument().catch(reportError('Could not create a deck'))}

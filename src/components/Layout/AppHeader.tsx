@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { EditorTextSizeControl } from './EditorTextSizeControl';
+import { MAX_EDITOR_FONT_SIZE, MIN_EDITOR_FONT_SIZE } from '../../services/editorPreferences';
 import {
   Download,
   FilePlus2,
@@ -37,6 +39,8 @@ interface AppHeaderProps {
   canPresent: boolean;
   colorMode: ColorMode;
   vimMode: boolean;
+  editorFontSize: number;
+  onEditorFontSizeChange: (size: number) => void;
   explorerOpen: boolean;
   onExplorerToggle: () => void;
   onNew: () => void;
@@ -189,6 +193,7 @@ export function AppHeader(props: AppHeaderProps) {
         >
           {colorMode === 'dark' ? <Sun /> : <Moon />}
         </IconButton>
+        <EditorTextSizeControl fontSize={props.editorFontSize} onChange={props.onEditorFontSizeChange} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Editor settings">
@@ -196,6 +201,24 @@ export function AppHeader(props: AppHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={props.editorFontSize <= MIN_EDITOR_FONT_SIZE}
+              onSelect={(event) => {
+                event.preventDefault();
+                props.onEditorFontSizeChange(props.editorFontSize - 1);
+              }}
+            >
+              Smaller editor text ({props.editorFontSize}px)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={props.editorFontSize >= MAX_EDITOR_FONT_SIZE}
+              onSelect={(event) => {
+                event.preventDefault();
+                props.onEditorFontSizeChange(props.editorFontSize + 1);
+              }}
+            >
+              Larger editor text ({props.editorFontSize}px)
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => props.onVimModeChange(!vimMode)}>
               {vimMode ? '✓ ' : ''}Vim mode
             </DropdownMenuItem>

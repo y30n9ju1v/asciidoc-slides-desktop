@@ -31,6 +31,9 @@ cd src-tauri && cargo test    # Rust(PDF) 테스트
 | `:slide-theme: light\|dark\|ocean\|warm`                           | 색 테마                                 |
 | `:slide-style: classic\|underline\|banner\|minimal\|elegant`       | 레이아웃·글꼴 스타일                    |
 
+편집기 글자 크기는 헤더의 `− / +` 버튼 또는 `Editor settings` 메뉴에서 1px씩 조절합니다(12–22px, 기본 14px).
+크기는 이 앱의 기기별 설정으로 저장되며 원문·슬라이드 출력·편집 이력에는 영향을 주지 않습니다.
+
 ### 동영상
 
 | 출력      | 로컬 동영상                     | 유튜브                                              |
