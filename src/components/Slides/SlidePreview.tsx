@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { AlertTriangle, StickyNote } from 'lucide-react';
+import { createWheelStepper, slideForKey } from '../../services/filmstripNavigation';
 import type { SlideDeck } from '../../services/slideDeck';
 import { SlideView } from './SlideView';
 
@@ -88,13 +89,56 @@ interface FilmstripProps {
   onSelect: (index: number) => void;
 }
 
+/**
+ * Thumbnail strip for quick review: arrow keys, Page Up/Down, and Home/End
+ * move the selection when the strip has focus (only the selected thumbnail
+ * is in the Tab order), and the mouse wheel or trackpad over the strip steps
+ * through slides instead of scrolling it.
+ */
 function Filmstrip({ deck, index, documentDir, onSelect }: FilmstripProps) {
   const filmstripRef = useRef<HTMLDivElement>(null);
+  const count = deck?.slides.length ?? 0;
+  const latest = useRef({ index, count, onSelect });
+  useLayoutEffect(() => {
+    latest.current = { index, count, onSelect };
+  });
+
+  // Keep the selected thumbnail visible, and keep focus on it while the user navigates the strip.
   useEffect(() => {
-    filmstripRef.current
-      ?.querySelector<HTMLElement>(`[data-index="${index}"]`)
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const strip = filmstripRef.current;
+    const item = strip?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+    item?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (item && strip?.contains(document.activeElement)) item.focus({ preventScroll: true });
   }, [index]);
+
+  // Native listener: React's wheel handler is passive and cannot stop the strip from scrolling.
+  useEffect(() => {
+    const strip = filmstripRef.current;
+    if (!strip) return;
+    const step = createWheelStepper();
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return; // pinch-zoom gestures
+      event.preventDefault();
+      const direction = step(event);
+      const { index: current, count: total, onSelect: select } = latest.current;
+      const next = Math.max(0, Math.min(total - 1, current + direction));
+      if (direction !== 0 && next !== current) {
+        // Another wheel event can arrive before React commits this selection.
+        latest.current.index = next;
+        select(next);
+      }
+    };
+    strip.addEventListener('wheel', onWheel, { passive: false });
+    return () => strip.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const next = slideForKey(event.key, index, count);
+    if (next === null) return;
+    event.preventDefault();
+    if (next !== index) onSelect(next);
+  };
 
   return (
     <div
@@ -102,6 +146,8 @@ function Filmstrip({ deck, index, documentDir, onSelect }: FilmstripProps) {
       className="flex h-[124px] shrink-0 items-center gap-3 overflow-x-auto border-t bg-[var(--bg-header)] px-4"
       role="listbox"
       aria-label="Slides"
+      aria-orientation="horizontal"
+      onKeyDown={onKeyDown}
     >
       {deck?.slides.map((item, i) => (
         <button
@@ -109,6 +155,7 @@ function Filmstrip({ deck, index, documentDir, onSelect }: FilmstripProps) {
           type="button"
           role="option"
           data-index={i}
+          tabIndex={i === index ? 0 : -1}
           aria-selected={i === index}
           aria-current={i === index}
           aria-label={`Slide ${i + 1}: ${item.title || 'Untitled'}`}
