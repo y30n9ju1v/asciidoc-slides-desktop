@@ -138,6 +138,7 @@ export function AppHeader(props: AppHeaderProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-1">
+        <EditorTextSizeControl fontSize={props.editorFontSize} onChange={props.onEditorFontSizeChange} />
         <Select value={styleId} onValueChange={(value) => props.onStyleChange(value as SlideStyleId)}>
           <SelectTrigger className="h-8 w-[112px]" aria-label="Slide style">
             <SelectValue />
@@ -193,7 +194,6 @@ export function AppHeader(props: AppHeaderProps) {
         >
           {colorMode === 'dark' ? <Sun /> : <Moon />}
         </IconButton>
-        <EditorTextSizeControl fontSize={props.editorFontSize} onChange={props.onEditorFontSizeChange} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Editor settings">
