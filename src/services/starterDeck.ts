@@ -34,6 +34,7 @@ print("Hello, slides!")
 | PDF | 배포용 고정 레이아웃
 |===
 
+[.closing]
 == 감사합니다
 
 질문이 있으신가요?

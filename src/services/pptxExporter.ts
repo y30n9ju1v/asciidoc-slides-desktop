@@ -7,6 +7,7 @@ import { renderMermaidSvg } from './mermaidRenderer';
 import { SLIDE_HEIGHT_IN, SLIDE_WIDTH_IN, type Slide, type SlideDeck } from './slideDeck';
 import type { SlideStyle } from './slideStyles';
 import type { SlideTheme } from './slideThemes';
+import { slideChrome } from './slideChrome';
 
 /**
  * Builds a native, editable PowerPoint file: real text boxes with bullet
@@ -90,7 +91,19 @@ function addTextFrame(slide: PptxSlide, frame: Extract<Frame, { kind: 'text' }>,
 }
 
 function addCodeFrame(slide: PptxSlide, frame: Extract<Frame, { kind: 'code' }>, theme: SlideTheme): void {
-  slide.addText(frame.code, {
+  const lines = frame.code.split('\n');
+  const highlights = new Set(frame.highlights);
+  const text = frame.highlights?.length
+    ? lines.map((line, index) => ({
+        text: `${index + 1}  ${line}`,
+        options: {
+          breakLine: index < lines.length - 1,
+          bold: highlights.has(index + 1),
+          color: hex(highlights.has(index + 1) ? theme.codeText : theme.muted),
+        },
+      }))
+    : frame.code;
+  slide.addText(text, {
     ...frame.box,
     fontFace: MONO_FACE,
     fontSize: Math.max(7, frame.fontSize),
@@ -199,18 +212,6 @@ function addVideoFrame(slide: PptxSlide, frame: Extract<Frame, { kind: 'video' }
   slide.addMedia({ type: 'video', data: loaded.data, extn: loaded.extn, cover, ...box });
 }
 
-function addSlideNumber(slide: PptxSlide, color: string): void {
-  slide.slideNumber = {
-    x: SLIDE_WIDTH_IN - 1.0,
-    y: SLIDE_HEIGHT_IN - 0.5,
-    w: 0.6,
-    h: 0.3,
-    fontSize: 11,
-    color: hex(color),
-    align: 'right',
-  };
-}
-
 /**
  * Colors for title and section slides: filled with the hero color, or
  * plain with accent-colored titles (SlideStyle.heroFill).
@@ -297,6 +298,7 @@ function addTitleSlide(slide: PptxSlide, deck: SlideDeck, data: Slide, context: 
 }
 
 function addSectionSlide(slide: PptxSlide, data: Slide, context: ExportContext): void {
+  if (data.layout === 'closing') context = { ...context, style: { ...context.style, heroAlign: 'center' } };
   const { theme, style } = context;
   const hero = heroContext(context);
   slide.background = { color: hex(hero.background) };
@@ -325,7 +327,6 @@ function addSectionSlide(slide: PptxSlide, data: Slide, context: ExportContext):
       hero.context,
     );
   }
-  addSlideNumber(slide, hero.context.theme.muted);
 }
 
 /** Adds the content-slide title with the style's decoration; returns where the body starts. */
@@ -377,7 +378,6 @@ function addContentSlide(slide: PptxSlide, data: Slide, context: ExportContext):
   layoutBlocks(data.blocks, body, theme, data.blockLayouts, data.videos).forEach((frame) =>
     addFrame(slide, frame, context),
   );
-  addSlideNumber(slide, theme.muted);
 }
 
 async function rasterized(svg: string | null): Promise<LoadedImage | null> {
@@ -439,6 +439,35 @@ async function loadDeckMedia(deck: SlideDeck, documentDir: string | null): Promi
   return media;
 }
 
+async function addSlideBackground(
+  slide: PptxSlide,
+  data: Slide,
+  deck: SlideDeck,
+  documentDir: string | null,
+): Promise<void> {
+  if (data.backgroundImage) {
+    const image = await loadFileImage(documentDir, data.backgroundImage);
+    if (!image) throw new Error(`Could not load background: ${data.backgroundImage}`);
+    slide.addImage({
+      data: image.data,
+      x: 0,
+      y: 0,
+      w: SLIDE_WIDTH_IN,
+      h: SLIDE_HEIGHT_IN,
+      sizing: { type: 'cover', w: SLIDE_WIDTH_IN, h: SLIDE_HEIGHT_IN },
+    });
+    const color = data.layout !== 'content' && deck.style.heroFill ? deck.theme.heroBackground : deck.theme.background;
+    slide.addShape('rect' as PptxGenJS.ShapeType, {
+      x: 0,
+      y: 0,
+      w: SLIDE_WIDTH_IN,
+      h: SLIDE_HEIGHT_IN,
+      line: { transparency: 100 },
+      fill: { color: hex(color), transparency: 25 },
+    });
+  }
+}
+
 /** Builds the .pptx bytes for a deck. */
 export async function buildPptx(deck: SlideDeck, documentDir: string | null): Promise<Uint8Array> {
   const { default: PptxGenJSClass } = await import('pptxgenjs');
@@ -457,14 +486,33 @@ export async function buildPptx(deck: SlideDeck, documentDir: string | null): Pr
     media: await loadDeckMedia(deck, documentDir),
   };
 
-  for (const data of deck.slides) {
+  for (const [index, data] of deck.slides.entries()) {
     const slide = pptx.addSlide();
+    await addSlideBackground(slide, data, deck, documentDir);
     if (data.layout === 'title') addTitleSlide(slide, deck, data, context);
-    else if (data.layout === 'section') addSectionSlide(slide, data, context);
+    else if (data.layout === 'section' || data.layout === 'closing') addSectionSlide(slide, data, context);
     else addContentSlide(slide, data, context);
+    addChrome(slide, data, index, context);
     if (data.notes) slide.addNotes(data.notes);
   }
   if (deck.slides.length === 0) pptx.addSlide();
   const output = await pptx.write({ outputType: 'uint8array' });
   return output as Uint8Array;
+}
+
+function addChrome(slide: PptxSlide, data: Slide, index: number, context: ExportContext): void {
+  const chrome = slideChrome(data, index);
+  const color = data.layout !== 'content' && context.style.heroFill ? context.theme.heroText : context.theme.muted;
+  const options = {
+    fontFace: context.fontFace,
+    fontSize: 11,
+    color: hex(color),
+    margin: 0,
+    h: 0.22,
+    breakLine: false,
+    fit: 'shrink' as const,
+  };
+  if (chrome.header) slide.addText(chrome.header, { ...options, x: 0.35, y: 0.18, w: 11.45 });
+  if (chrome.footer) slide.addText(chrome.footer, { ...options, x: 0.35, y: 7.05, w: 11.45 });
+  if (chrome.pageNumber) slide.addText(chrome.pageNumber, { ...options, x: 11.95, y: 7.05, w: 1.03, align: 'right' });
 }

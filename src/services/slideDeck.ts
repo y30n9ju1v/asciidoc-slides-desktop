@@ -23,7 +23,7 @@ export function ptToPx(pt: number): number {
   return (pt * PX_PER_IN) / 72;
 }
 
-export type SlideLayout = 'title' | 'section' | 'content';
+export type SlideLayout = 'title' | 'section' | 'content' | 'closing';
 
 /**
  * Author-controlled sizing of one top-level slide block, from AsciiDoc
@@ -31,6 +31,7 @@ export type SlideLayout = 'title' | 'section' | 'content';
  * `[width=60%]`, `[font-size=80%]`.
  */
 export interface BlockLayout {
+  codeHighlights?: number[];
   /** Fraction of the slide body width, 0.1-1. */
   width: number | null;
   /** Font-size multiplier, 0.4-2. */
@@ -57,7 +58,15 @@ export interface SlideVideo {
   layout: BlockLayout | null;
 }
 
+export interface SlideChrome {
+  header: string;
+  footer: string;
+  pageNumber: string;
+}
+
 export interface Slide {
+  chrome?: SlideChrome;
+  backgroundImage?: string;
   layout: SlideLayout;
   title: string;
   /** Second title line, shown only by the title layout. */

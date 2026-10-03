@@ -87,7 +87,15 @@ function Diagram({ code }: { code: string }) {
   );
 }
 
-function CodeBlock({ code, language }: { code: string; language: string | null }) {
+function CodeBlock({
+  code,
+  language,
+  highlights = [],
+}: {
+  code: string;
+  language: string | null;
+  highlights?: number[];
+}) {
   const html = useMemo(() => {
     if (!language || !hljs.getLanguage(language)) return null;
     try {
@@ -96,6 +104,21 @@ function CodeBlock({ code, language }: { code: string; language: string | null }
       return null;
     }
   }, [code, language]);
+  if (highlights.length)
+    return (
+      <pre className="hljs slide-highlight-code">
+        <code>
+          {code.split('\n').map((line, index) => (
+            <span key={index} className="slide-code-line" data-highlight={highlights.includes(index + 1)}>
+              <span aria-hidden="true" className="slide-code-number">
+                {index + 1}
+              </span>
+              {line || ' '}
+            </span>
+          ))}
+        </code>
+      </pre>
+    );
   return <pre className="hljs">{html ? <code dangerouslySetInnerHTML={{ __html: html }} /> : <code>{code}</code>}</pre>;
 }
 
@@ -321,7 +344,8 @@ export function SlideBlocks({ slide }: { slide: Pick<Slide, 'blocks' | 'blockLay
     <>
       {slideItems(slide).map((item, index) => {
         const layout = item.kind === 'block' ? item.layout : item.video.layout;
-        const content = item.kind === 'block' ? <Block block={item.block} /> : <SlideVideo video={item.video} />;
+        const content =
+          item.kind === 'block' ? <TopBlock block={item.block} layout={layout} /> : <SlideVideo video={item.video} />;
         return layout ? (
           <div key={index} className="slide-sized" data-align={layout.align ?? undefined} style={layoutStyle(layout)}>
             {content}
@@ -331,6 +355,16 @@ export function SlideBlocks({ slide }: { slide: Pick<Slide, 'blocks' | 'blockLay
         );
       })}
     </>
+  );
+}
+
+function TopBlock({ block, layout }: { block: SafeBlock; layout: BlockLayout | null }) {
+  if (block.type !== 'code' || !layout?.codeHighlights?.length) return <Block block={block} />;
+  return (
+    <div>
+      <Caption text={block.caption} />
+      <CodeBlock code={block.code} language={block.language} highlights={layout.codeHighlights} />
+    </div>
   );
 }
 

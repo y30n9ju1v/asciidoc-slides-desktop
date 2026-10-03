@@ -51,6 +51,12 @@ Pages의 `test:publication`, `release:macos:verify`는 이 저장소에 없다. 
 
 ## 4. 검증 결과를 과장하지 않는다
 
+`closingSlide.test.ts`는 `[.closing]`의 본문·발표자 노트 보존, 기본 머리말·꼬리말·번호 숨김, 개별 재정의와 PPTX 텍스트·가운데 정렬을 검사한다. 네이티브 전체 레이아웃 컴파일 테스트에도 closing 장을 포함한다. 샘플 마지막 장의 실제 WebView·PDF·PowerPoint 배치와 긴 제목의 넘침은 별도 시각 검증 대상이다.
+
+머리말·꼬리말·번호 설정은 `slideChrome.test.ts`에서 표지 기본값, 전역/개별 재정의, 시작 번호와 PPTX 텍스트를 확인한다. `compiles_background_and_highlighted_code`는 이 문구가 포함된 PDF 조판도 검사한다. 실제 미리보기·PPTX·PDF에서 긴 한글 문구, 배경 이미지 위 대비, 꼬리말과 번호의 겹침을 별도로 확인한다.
+
+코드 강조는 `slideEnhancements.test.ts`, 배경/PPTX 편집 가능 텍스트는 `pptxEnhancements.test.ts`, 자산·폰트 점검 실패는 `qualityCheckService.test.ts`, 네이티브 조판은 `compiles_background_and_highlighted_code`로 회귀 검사한다. 샘플의 배경·코드 강조를 실제 WebView·PowerPoint·PDF에서 비교하고, 점검 결과 클릭 시 원문 이동도 확인한다. 품질 점검의 레이아웃 경고는 추정치이며 실제 PDF 경계·글리프 지원·영상 재생 검증이 아니다.
+
 자산 경계는 `src-tauri/src/asset_paths.rs`에서 현재 덱 밖으로 나가는 심볼릭 링크도 검사한다. PDF 자산별 스코프·읽기 크기 제한, 출력 심볼릭 링크 거부, 임시 파일 실패 시 기존 PDF 보존과 새 PDF의 배타적 직접 생성(App Sandbox 경로)은 `slide_compiler.rs` 테스트에 포함한다. 프런트엔드 단위 테스트는 네이티브 경로 resolver를 대체하므로 이 Rust 테스트를 함께 실행한다.
 
 - Mock 파일 API의 성공은 네이티브 다이얼로그·샌드박스 성공을 증명하지 않는다.

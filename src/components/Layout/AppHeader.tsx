@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { EditorTextSizeControl } from './EditorTextSizeControl';
 import { SlideFontControl } from './SlideFontControl';
-import { MAX_EDITOR_FONT_SIZE, MIN_EDITOR_FONT_SIZE } from '../../services/editorPreferences';
 import {
   Download,
   FilePlus2,
@@ -31,6 +30,8 @@ import { SLIDE_STYLES, type SlideStyleId } from '../../services/slideStyles';
 import { SLIDE_THEMES, type SlideThemeId } from '../../services/slideThemes';
 
 interface AppHeaderProps {
+  canCheckOutput: boolean;
+  onCheckOutput: () => void;
   fontFamily?: string;
   onFontFamilyChange: (font: string) => void;
   fileName: string;
@@ -127,8 +128,8 @@ export function AppHeader(props: AppHeaderProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-1">
-        <EditorTextSizeControl fontSize={props.editorFontSize} onChange={props.onEditorFontSizeChange} />
         <SlideFontControl value={props.fontFamily} onChange={props.onFontFamilyChange} />
+        <EditorTextSizeControl fontSize={props.editorFontSize} onChange={props.onEditorFontSizeChange} />
         <Select value={styleId} onValueChange={(value) => props.onStyleChange(value as SlideStyleId)}>
           <SelectTrigger className="h-8 w-[112px]" aria-label="Slide style">
             <SelectValue />
@@ -191,23 +192,8 @@ export function AppHeader(props: AppHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              disabled={props.editorFontSize <= MIN_EDITOR_FONT_SIZE}
-              onSelect={(event) => {
-                event.preventDefault();
-                props.onEditorFontSizeChange(props.editorFontSize - 1);
-              }}
-            >
-              Smaller editor text ({props.editorFontSize}px)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={props.editorFontSize >= MAX_EDITOR_FONT_SIZE}
-              onSelect={(event) => {
-                event.preventDefault();
-                props.onEditorFontSizeChange(props.editorFontSize + 1);
-              }}
-            >
-              Larger editor text ({props.editorFontSize}px)
+            <DropdownMenuItem disabled={!props.canCheckOutput} onSelect={props.onCheckOutput}>
+              Output quality check…
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => props.onVimModeChange(!vimMode)}>
               {vimMode ? '✓ ' : ''}Vim mode

@@ -193,6 +193,7 @@ export function SlidePreview({ deck, parseError, isParsing, currentIndex, docume
         isParsing={isParsing}
         notes={deck?.slides[index]?.notes ?? ''}
       />
+
       <Filmstrip deck={deck} index={index} documentDir={documentDir} onSelect={onSelect} />
     </div>
   );

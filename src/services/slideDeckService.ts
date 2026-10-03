@@ -2,11 +2,13 @@ import { load, LoggerManager, MemoryLogger } from '@asciidoctor/core';
 import {
   normalizeSafeDocument,
   plainText,
+  resolveSafeAssetRef,
   type ParsedAsciidocNode,
   type SafeBlock,
   type SafeDiagnostic,
 } from '../../packages/asciidoc-typst/typescript/src';
 import { blockLayoutOf } from './blockLayout';
+import { resolveSlideChrome, type ChromeSettings } from './slideChrome';
 import { parseVideoNode, placeVideo } from './slideVideo';
 import { blocksToPlainText } from './safeText';
 import {
@@ -76,6 +78,8 @@ function lineOf(node: AsciidocNode): number | null {
 }
 
 interface SlideDraft {
+  chrome?: ChromeSettings;
+  backgroundImage?: unknown;
   layout: SlideLayout;
   title: string;
   subtitle: string;
@@ -86,13 +90,24 @@ interface SlideDraft {
 }
 
 class DeckBuilder {
+  constructor(private readonly chrome: ChromeSettings = {}) {}
   readonly slides: Slide[] = [];
   readonly diagnostics: SafeDiagnostic[] = [];
 
   add(draft: SlideDraft): void {
+    const background = typeof draft.backgroundImage === 'string' ? resolveSafeAssetRef(draft.backgroundImage) : null;
+    if (draft.backgroundImage && background?.kind !== 'document-relative')
+      this.diagnostics.push({
+        severity: 'error',
+        message: 'Background image must be a safe document-relative path.',
+        location: { line: draft.line },
+        code: 'unsafe-asset-target',
+      });
     const body = this.normalizeBody(draft.nodes);
     const notes = blocksToPlainText(this.normalize(draft.notes.flatMap(notesContent)));
     this.slides.push({
+      chrome: resolveSlideChrome(this.chrome, draft.chrome ?? {}, draft.layout, this.slides.length),
+      backgroundImage: background?.kind === 'document-relative' ? background.relativePath : undefined,
       layout: draft.layout,
       title: draft.title,
       subtitle: draft.subtitle,
@@ -214,11 +229,18 @@ function addSectionSlides(builder: DeckBuilder, section: AsciidocNode): void {
   const title = plainText(section.title ?? '');
   const roles = rolesOf(section);
   const isEmpty = chunks.every((chunk) => chunk.length === 0);
-  const layout: SlideLayout =
+  const regularLayout: SlideLayout =
     roles.some((role) => SECTION_ROLES.has(role)) || (isEmpty && subSlides.length > 0) ? 'section' : 'content';
+  const layout = roles.includes('closing') ? 'closing' : regularLayout;
 
   chunks.forEach((nodes, index) => {
     builder.add({
+      backgroundImage: section.attributes?.['background-image'],
+      chrome: {
+        header: section.attributes?.['slide-header'],
+        footer: section.attributes?.['slide-footer'],
+        numbers: section.attributes?.['slide-page-numbers'],
+      },
       layout,
       title,
       subtitle: '',
@@ -273,7 +295,13 @@ export async function parseSlideDeck(source: string): Promise<SlideDeck> {
   const header = doc as unknown as DocumentHeader;
   const root = doc as unknown as AsciidocNode;
   const metadata = readMetadata(header);
-  const builder = new DeckBuilder();
+  const builder = new DeckBuilder({
+    header: header.getAttribute('slide-header'),
+    footer: header.getAttribute('slide-footer'),
+    numbers: header.getAttribute('slide-page-numbers'),
+    titleNumber: header.getAttribute('slide-title-page-number'),
+    start: header.getAttribute('slide-number-start'),
+  });
   const topLevel = root.blocks ?? [];
   const preamble = topLevel.find((node) => node.context === 'preamble');
   const preambleBody = partitionBody(preamble?.blocks ?? []);
@@ -282,6 +310,7 @@ export async function parseSlideDeck(source: string): Promise<SlideDeck> {
   if (metadata.title) {
     builder.add({
       layout: 'title',
+      backgroundImage: header.getAttribute('slide-background'),
       title: metadata.title,
       subtitle: metadata.subtitle,
       hideTitle: false,

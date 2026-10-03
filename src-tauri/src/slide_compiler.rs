@@ -499,7 +499,8 @@ mod tests {
               {{ "layout": "title", "title": "Title", "subtitle": "Sub", "hideTitle": false, "blocks": [], "notes": "", "line": 1 }},
               {{ "layout": "section", "title": "Part", "subtitle": "", "hideTitle": false, "blocks": [], "notes": "", "line": 2 }},
               {{ "layout": "content", "title": "Everything", "subtitle": "", "hideTitle": false, "blocks": [{}], "notes": "n", "line": 3 }},
-              {{ "layout": "content", "title": "Overflow", "subtitle": "", "hideTitle": true, "blocks": [{}], "notes": "", "line": 4 }}
+              {{ "layout": "content", "title": "Overflow", "subtitle": "", "hideTitle": true, "blocks": [{}], "notes": "", "line": 4 }},
+              {{ "layout": "closing", "title": "Thank you", "subtitle": "", "hideTitle": false, "blocks": [], "notes": "", "line": 5 }}
             ]"#,
             blocks.join(", "),
             long_body.join(", ")
@@ -513,7 +514,7 @@ mod tests {
         let document = compile_document(source.clone(), &Vec::new()).unwrap();
         assert_eq!(
             document.pages().len(),
-            4,
+            5,
             "overflowing content must shrink, not add pages"
         );
         assert!(compile_pdf(source, &Vec::new())
@@ -542,6 +543,7 @@ mod tests {
             slide.block_layouts = (0..slide.blocks.len())
                 .map(|i| {
                     (i % 2 == 0).then_some(BlockLayout {
+                        code_highlights: vec![],
                         width: Some(0.6),
                         scale: Some(0.8),
                         align: Some(BlockAlign::Center),
@@ -590,7 +592,7 @@ mod tests {
             let source = write_slide_deck(&request.deck, &HashSet::new()).unwrap();
             let document = compile_document(source, &Vec::new())
                 .unwrap_or_else(|err| panic!("{decoration:?}/{font:?}: {}", err.message));
-            assert_eq!(document.pages().len(), 4);
+            assert_eq!(document.pages().len(), 5);
         }
     }
 
@@ -688,6 +690,35 @@ mod tests {
         assert!(compile_pdf(source, &Vec::new())
             .unwrap()
             .starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn compiles_background_and_highlighted_code() {
+        let mut request = parse_request(&request(&rich_slides())).unwrap();
+        request.deck.slides.truncate(1);
+        let slide = &mut request.deck.slides[0];
+        slide.background_image = Some("images/background.svg".into());
+        slide.chrome = Some(crate::slide_deck::SlideChrome {
+            header: "Company header".into(),
+            footer: "Conference footer".into(),
+            page_number: "42".into(),
+        });
+        slide.blocks = serde_json::from_value(serde_json::json!([{"type":"code", "code":"a\nb\nc", "language":"python", "caption":null, "location":{"line":1}}])).unwrap();
+        slide.block_layouts = vec![Some(crate::slide_deck::BlockLayout {
+            width: None,
+            scale: Some(0.8),
+            align: None,
+            code_highlights: vec![2],
+        })];
+        let assets: LoadedAssets = vec![("images/background.svg".into(), br##"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#abcdef"/></svg>"##.to_vec())];
+        let paths = assets.iter().map(|(path, _)| path.clone()).collect();
+        let source = write_slide_deck(&request.deck, &paths).unwrap();
+        assert!(source.contains("background.svg"));
+        assert!(source.contains("2  b"));
+        assert!(source.contains("Company header"));
+        assert!(source.contains("Conference footer"));
+        assert!(source.contains("42"));
+        assert!(compile_pdf(source, &assets).unwrap().starts_with(b"%PDF"));
     }
 
     #[test]

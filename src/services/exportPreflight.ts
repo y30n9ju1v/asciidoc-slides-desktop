@@ -1,10 +1,12 @@
 import type { SafeInline } from '../../packages/asciidoc-typst/typescript/src';
 import { blockInlines, walkBlocks } from './deckAssets';
 import type { Slide, SlideDeck } from './slideDeck';
+import { inspectLayoutQuality } from './outputQuality';
 
 export type ExportFormat = 'pptx' | 'pdf';
 
 export interface ExportIssue {
+  slideIndex?: number;
   severity: 'error' | 'warning';
   message: string;
 }
@@ -70,6 +72,7 @@ export function inspectExport(deck: SlideDeck, format: ExportFormat): ExportIssu
     message: `${diagnostic.location.line ? `Line ${diagnostic.location.line}: ` : ''}${diagnostic.message}`,
   }));
   if (!deck.slides.length) issues.push({ severity: 'error', message: 'Add a slide before exporting.' });
+  issues.push(...inspectLayoutQuality(deck));
   if (format === 'pdf') return [...issues, ...pdfVideoIssues(deck)];
   return [...issues, ...deck.slides.flatMap(pptxSlideIssues)];
 }

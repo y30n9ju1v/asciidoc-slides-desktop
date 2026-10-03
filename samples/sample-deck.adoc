@@ -4,6 +4,11 @@
 :slide-theme: light
 :slide-style: classic
 :slide-font: Apple SD Gothic Neo
+:slide-header: AsciiDoc Slides
+:slide-footer: 텍스트로 만드는 발표 자료
+:slide-page-numbers: true
+:slide-title-page-number: false
+:slide-number-start: 1
 
 AsciiDoc으로 쓰고, PPTX와 PDF로 출판합니다.
 
@@ -112,10 +117,27 @@ TIP: 미리보기에서 슬라이드를 클릭하면 해당 소스 위치로 이
 
 WARNING: 원격 이미지는 내보내기에 포함되지 않습니다. 이미지 파일은 문서 옆에 두세요.
 
-[%notitle]
-== 감사합니다
+[background-image="images/background.svg"]
+== 배경 이미지
 
-[.lead]
-감사합니다!
+문서 폴더 안의 이미지를 배경으로 사용합니다. 테마 색상을 덧씌워 텍스트 가독성을 유지합니다.
+
+== 코드 줄 강조
+
+[source,python,highlight="2;4-5"]
+----
+def greet(name):
+    return f"Hello, {name}!"
+
+message = greet("AsciiDoc")
+print(message)
+----
+
+`highlight="2;4-5"`는 2번 줄과 4~5번 줄을 강조합니다.
+
+상단 *Editor settings → Output quality check*에서 글자 크기·누락된 파일·선택 폰트를 점검할 수 있습니다.
+
+[.closing]
+== 감사합니다
 
 질문이 있으신가요?

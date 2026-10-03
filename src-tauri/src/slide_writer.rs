@@ -287,10 +287,49 @@ impl<'a> Writer<'a> {
         self.push(&out);
     }
 
-    fn slide_number(&mut self, number: usize, color: &str) {
-        self.push(&format!(
-            "#place(bottom + right, dx: -0.35in, dy: -0.25in, text(size: 11pt, fill: {color})[{number}])\n"
-        ));
+    fn slide_chrome(&mut self, slide: &Slide, number: usize, color: &str) {
+        let fallback = if matches!(slide.layout, SlideLayout::Title | SlideLayout::Closing) {
+            String::new()
+        } else {
+            number.to_string()
+        };
+        let (header, footer, page_number) = slide
+            .chrome
+            .as_ref()
+            .map(|chrome| {
+                (
+                    chrome.header.as_str(),
+                    chrome.footer.as_str(),
+                    chrome.page_number.as_str(),
+                )
+            })
+            .unwrap_or(("", "", &fallback));
+        for (value, position, dx, dy, width) in [
+            (header, "top + left", "0.35in", "0.18in", "11.45in"),
+            (footer, "bottom + left", "0.35in", "-0.25in", "11.45in"),
+            (
+                page_number,
+                "bottom + right",
+                "-0.35in",
+                "-0.25in",
+                "1.03in",
+            ),
+        ] {
+            if value.is_empty() {
+                continue;
+            }
+            let label: String = value
+                .chars()
+                .filter(|ch| !ch.is_control())
+                .take(160)
+                .collect();
+            let align = if position == "bottom + right" {
+                "right"
+            } else {
+                "left"
+            };
+            self.push(&format!("#place({position}, dx: {dx}, dy: {dy}, block(width: {width}, height: 0.22in, clip: true)[#set align({align})\n#text(size: 11pt, fill: {color})[{}]])\n", text(&label)));
+        }
     }
 
     /// Opens a title/section page: hero-filled or plain per the style.
@@ -362,12 +401,23 @@ impl<'a> Writer<'a> {
             self.top_blocks(slide)?;
             self.push("]\n");
         }
-        self.push("]\n]\n]\n");
+        self.push("]\n]\n");
+        let chrome_color = if deck.style.hero_fill {
+            self.theme.hero_text.clone()
+        } else {
+            self.theme.muted.clone()
+        };
+        self.slide_chrome(slide, 1, &chrome_color);
+        self.push("]\n");
         Ok(())
     }
 
     fn section_slide(&mut self, deck: &SlideDeck, slide: &Slide, number: usize) -> WriteResult {
-        let (title_color, fg) = self.open_hero_page(&deck.style);
+        let mut style = deck.style;
+        if matches!(slide.layout, SlideLayout::Closing) {
+            style.hero_align = HeroAlign::Center;
+        }
+        let (title_color, fg) = self.open_hero_page(&style);
         self.accent_bar(&title_color);
         self.push(&format!(
             "#text(size: {}pt, weight: \"bold\", fill: {title_color})[{}]\n\n",
@@ -385,7 +435,7 @@ impl<'a> Writer<'a> {
         } else {
             self.theme.muted.clone()
         };
-        self.slide_number(number, &number_color);
+        self.slide_chrome(slide, number, &number_color);
         self.push("]\n");
         Ok(())
     }
@@ -432,7 +482,7 @@ impl<'a> Writer<'a> {
         self.top_blocks(slide)?;
         self.push("],\n)\n]\n");
         let muted = self.theme.muted.clone();
-        self.slide_number(number, &muted);
+        self.slide_chrome(slide, number, &muted);
         self.push("]\n");
         Ok(())
     }
@@ -452,6 +502,22 @@ impl<'a> Writer<'a> {
             }
             let layout = slide.block_layouts.get(index).and_then(Option::as_ref);
             self.sized(layout, |writer| {
+                if let (SafeBlock::Code { code, caption, .. }, Some(layout)) = (block, layout) {
+                    if !layout.code_highlights.is_empty() {
+                        let highlights: HashSet<usize> = layout.code_highlights.iter().copied().take(1000).filter(|line| (1..=1000).contains(line)).collect();
+                        writer.caption(caption.as_deref());
+                        writer.push("#block(width: 100%, inset: 12pt, fill: ");
+                        writer.push(&writer.theme.code_background.clone());
+                        writer.push(")[\n");
+                        for (index, line) in code.split('\n').enumerate() {
+                            let selected = highlights.contains(&(index + 1));
+                            let color = if selected { &writer.theme.code_text } else { &writer.theme.muted };
+                            writer.push(&format!("#text(fill: {color}, weight: {}, size: {:.4}em, font: {})[#raw({})]#linebreak()\n", if selected { "\"bold\"" } else { "\"regular\"" }, writer.theme.code_size / writer.theme.body_size, font_array(MONO_FONT_FAMILIES), string_literal(&format!("{}  {}", index + 1, line))));
+                        }
+                        writer.push("]\n");
+                        return Ok(());
+                    }
+                }
                 writer.block(block, usize::from(layout.is_some()))
             })?;
         }
@@ -930,10 +996,27 @@ pub fn write_slide_deck(deck: &SlideDeck, assets: &HashSet<String>) -> Result<St
         writer.push("#page[]\n");
     }
     for (index, slide) in deck.slides.iter().enumerate() {
+        if let Some(path) = &slide.background_image {
+            if !assets.contains(path) {
+                return Err(WriteError(
+                    "Background image is missing or not allowed.".into(),
+                ));
+            }
+            let color = if !matches!(slide.layout, SlideLayout::Content) && deck.style.hero_fill {
+                &writer.theme.hero_background
+            } else {
+                &writer.theme.background
+            };
+            writer.push(&format!("#set page(background: [#image({}, width: 100%, height: 100%, fit: \"cover\")#place(top + left, rect(width: 100%, height: 100%, fill: {color}.transparentize(25%), stroke: none))])\n", string_literal(path)));
+        } else {
+            writer.push("#set page(background: none)\n");
+        }
         let number = index + 1;
         match slide.layout {
             SlideLayout::Title => writer.title_slide(deck, slide)?,
-            SlideLayout::Section => writer.section_slide(deck, slide, number)?,
+            SlideLayout::Section | SlideLayout::Closing => {
+                writer.section_slide(deck, slide, number)?
+            }
             SlideLayout::Content => writer.content_slide(deck, slide, number)?,
         }
     }
@@ -976,6 +1059,7 @@ mod tests {
     #[test]
     fn block_layouts_are_clamped() {
         let layout = BlockLayout {
+            code_highlights: vec![],
             width: Some(5.0),
             scale: Some(0.8),
             align: Some(BlockAlign::Center),
@@ -987,6 +1071,7 @@ mod tests {
         );
         assert_eq!(close, "])\n");
         let (open, _) = layout_wrapper(&BlockLayout {
+            code_highlights: vec![],
             width: Some(f64::NAN),
             scale: Some(9.0),
             align: None,

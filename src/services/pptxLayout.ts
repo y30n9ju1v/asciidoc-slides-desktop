@@ -44,7 +44,7 @@ export interface Paragraph {
 
 export type Frame =
   | { kind: 'text'; box: Box; paragraphs: Paragraph[]; fontSize: number; align: BlockLayout['align'] }
-  | { kind: 'code'; box: Box; code: string; fontSize: number }
+  | { kind: 'code'; box: Box; code: string; fontSize: number; highlights?: number[] }
   | { kind: 'table'; box: Box; rows: Run[][][]; hasHeader: boolean; fontSize: number }
   | { kind: 'image'; box: Box; source: ImageSource; alt: string }
   | { kind: 'missingImage'; box: Box; alt: string }
@@ -297,6 +297,10 @@ function stackHeight(elements: Element[], width: number, theme: SlideTheme, font
   );
 }
 
+function codeHighlightsOf(element: Element) {
+  return element.layout?.codeHighlights;
+}
+
 function frameFor(element: Element, box: Box, theme: SlideTheme, fontScale: number, frames: Frame[]): void {
   switch (element.kind) {
     case 'text':
@@ -309,7 +313,13 @@ function frameFor(element: Element, box: Box, theme: SlideTheme, fontScale: numb
       });
       break;
     case 'code':
-      frames.push({ kind: 'code', box, code: element.code, fontSize: theme.codeSize * fontScale });
+      frames.push({
+        kind: 'code',
+        box,
+        code: element.code,
+        fontSize: theme.codeSize * fontScale,
+        highlights: codeHighlightsOf(element),
+      });
       break;
     case 'table':
       frames.push({

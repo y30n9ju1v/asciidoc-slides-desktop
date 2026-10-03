@@ -3,6 +3,8 @@ import { ptToPx, SLIDE_HEIGHT_PX, SLIDE_WIDTH_PX, type Slide, type SlideDeck } f
 import { isDarkSlideTheme, type SlideTheme } from '../../services/slideThemes';
 import { SlideAssetsContext } from './SlideAssetsContext';
 import { SlideBlocks } from './SlideBlocks';
+import { SlideBackground } from './SlideBackground';
+import { slideChrome } from '../../services/slideChrome';
 
 /**
  * Theme colors go in as `--theme-*` on the slide element; CSS maps them to
@@ -78,7 +80,11 @@ function FitBody({ children }: { children: ReactNode }) {
   );
 }
 
-function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; number: number }) {
+function heroAlign(deck: SlideDeck, slide: Slide) {
+  return slide.layout === 'closing' ? 'center' : deck.style.heroAlign;
+}
+
+function SlideSurface({ deck, slide }: { deck: SlideDeck; slide: Slide }) {
   const hasBody = slide.blocks.length + slide.videos.length > 0;
   if (slide.layout === 'title') {
     const byline = [deck.metadata.author, deck.metadata.date].filter(Boolean).join('  ·  ');
@@ -100,7 +106,7 @@ function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; 
       </>
     );
   }
-  if (slide.layout === 'section') {
+  if (['section', 'closing'].includes(slide.layout)) {
     return (
       <>
         <div className="slide-divider-bar" />
@@ -114,7 +120,6 @@ function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; 
             </div>
           </div>
         )}
-        <div className="slide-number">{number}</div>
       </>
     );
   }
@@ -124,7 +129,17 @@ function SlideSurface({ deck, slide, number }: { deck: SlideDeck; slide: Slide; 
       <FitBody>
         <SlideBlocks slide={slide} />
       </FitBody>
-      <div className="slide-number">{number}</div>
+    </>
+  );
+}
+
+function SlideChromeView({ slide, index }: { slide: Slide; index: number }) {
+  const chrome = slideChrome(slide, index);
+  return (
+    <>
+      {chrome.header && <div className="slide-running-header">{chrome.header}</div>}
+      {chrome.footer && <div className="slide-running-footer">{chrome.footer}</div>}
+      {chrome.pageNumber && <div className="slide-number">{chrome.pageNumber}</div>}
     </>
   );
 }
@@ -169,7 +184,7 @@ export function SlideView({ deck, index, documentDir, playback = false }: SlideV
             data-font={deck.style.font}
             data-title={deck.style.titleDecoration}
             data-hero-fill={deck.style.heroFill}
-            data-hero-align={deck.style.heroAlign}
+            data-hero-align={heroAlign(deck, slide)}
             style={{
               ...themeVariables(deck.theme),
               fontFamily: deck.fontFamily ? JSON.stringify(deck.fontFamily) : undefined,
@@ -179,7 +194,9 @@ export function SlideView({ deck, index, documentDir, playback = false }: SlideV
               visibility: scale > 0 ? 'visible' : 'hidden',
             }}
           >
-            <SlideSurface deck={deck} slide={slide} number={index + 1} />
+            <SlideSurface deck={deck} slide={slide} />
+            <SlideChromeView slide={slide} index={index} />
+            {slide.backgroundImage && <SlideBackground path={slide.backgroundImage} />}
           </div>
         </SlideAssetsContext.Provider>
       )}

@@ -4,6 +4,41 @@
 @import 'tw-animate-css';
 @import 'katex/dist/katex.min.css';
 
+.slide-code-line {
+  display: block;
+  white-space: pre;
+}
+.slide-code-line[data-highlight='false'] {
+  opacity: 0.5;
+}
+.slide-code-line[data-highlight='true'] {
+  font-weight: 700;
+  background: var(--item-active-bg);
+}
+.slide-code-number {
+  display: inline-block;
+  min-width: 3ch;
+  margin-right: 1ch;
+  opacity: 0.6;
+  user-select: none;
+}
+.slide-background-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: -1;
+}
+.slide-background-error {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  font-size: 12px;
+}
+
 /* Obsidian-inspired neutral surfaces with violet interactive states. */
 :root,
 [data-color-mode='dark'] {
@@ -286,6 +321,7 @@ body,
 }
 
 .slide-frame > .slide {
+  isolation: isolate;
   position: absolute;
   top: 0;
   left: 0;
@@ -452,6 +488,26 @@ body,
   bottom: 22px;
   color: var(--slide-muted);
   font-size: 15px;
+}
+
+.slide-running-header,
+.slide-running-footer {
+  position: absolute;
+  left: 34px;
+  right: 145px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--slide-muted);
+  font-size: 15px;
+  line-height: 20px;
+  pointer-events: none;
+}
+.slide-running-header {
+  top: 18px;
+}
+.slide-running-footer {
+  bottom: 22px;
 }
 
 .slide-body > * + * {

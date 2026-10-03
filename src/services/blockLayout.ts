@@ -1,4 +1,5 @@
 import type { BlockLayout } from './slideDeck';
+import { parseCodeHighlights } from './codeHighlight';
 
 /** Width of the content-slide body in logical pixels (1280 - 2 x 58 padding). */
 const BODY_WIDTH_PX = 1164;
@@ -42,5 +43,7 @@ export function blockLayoutOf(roles: string[], attributes: Record<string, unknow
     scale: parseScale(attributes?.['font-size']) ?? lastMatch(roles, ROLE_SCALES),
     align: lastMatch(roles, ROLE_ALIGNS),
   };
-  return layout.width === null && layout.scale === null && layout.align === null ? null : layout;
+  const highlights = parseCodeHighlights(attributes?.highlight);
+  if (highlights.length) layout.codeHighlights = highlights;
+  return layout.width === null && layout.scale === null && layout.align === null && !highlights.length ? null : layout;
 }

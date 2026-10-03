@@ -10,6 +10,7 @@ export function SlideFontControl({ value, onChange }: { value?: string; onChange
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const { fonts, error, loading } = useSystemFonts(open);
+  const currentFont = value || 'System default';
   const choose = (font: string) => {
     onChange(font);
     setOpen(false);
@@ -18,11 +19,19 @@ export function SlideFontControl({ value, onChange }: { value?: string; onChange
     <>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Slide font" onClick={() => setOpen(true)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-w-0 gap-1.5 px-2"
+            aria-label={`Slide font: ${currentFont}`}
+            title={currentFont}
+            onClick={() => setOpen(true)}
+          >
             <Type />
+            <span className="max-w-28 truncate text-xs">{currentFont}</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Slide font: {value || 'System default'}</TooltipContent>
+        <TooltipContent>Slide font: {currentFont}</TooltipContent>
       </Tooltip>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg p-5">
@@ -33,7 +42,7 @@ export function SlideFontControl({ value, onChange }: { value?: string; onChange
               and math use separate fonts.
             </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">Current: {value || 'System default'}</p>
+          <p className="text-sm text-muted-foreground">Current: {currentFont}</p>
           <input
             className="h-9 rounded-md border bg-background px-3 text-sm"
             aria-label="Search fonts"

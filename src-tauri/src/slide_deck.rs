@@ -12,6 +12,7 @@ pub const SUPPORTED_DECK_VERSION: u32 = 1;
 pub enum SlideLayout {
     Title,
     Section,
+    Closing,
     Content,
 }
 
@@ -27,6 +28,8 @@ pub enum BlockAlign {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockLayout {
+    #[serde(default)]
+    pub code_highlights: Vec<usize>,
     pub width: Option<f64>,
     pub scale: Option<f64>,
     pub align: Option<BlockAlign>,
@@ -35,6 +38,10 @@ pub struct BlockLayout {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Slide {
+    #[serde(default)]
+    pub chrome: Option<SlideChrome>,
+    #[serde(default)]
+    pub background_image: Option<String>,
     pub layout: SlideLayout,
     pub title: String,
     pub subtitle: String,
@@ -48,6 +55,14 @@ pub struct Slide {
     pub videos: Vec<SlideVideo>,
     #[allow(dead_code)]
     pub notes: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlideChrome {
+    pub header: String,
+    pub footer: String,
+    pub page_number: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

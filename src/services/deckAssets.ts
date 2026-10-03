@@ -57,6 +57,9 @@ function eachDeckBlock(deck: SlideDeck, visit: (block: SafeBlock) => void): void
 /** Document-relative image paths (block and inline) referenced anywhere in the deck. */
 export function deckImagePaths(deck: SlideDeck): string[] {
   const paths = new Set<string>();
+  deck.slides.forEach((slide) => {
+    if (slide.backgroundImage) paths.add(slide.backgroundImage);
+  });
   eachDeckBlock(deck, (block) => {
     if (block.type === 'image' && block.asset.kind === 'document-relative') paths.add(block.asset.relativePath);
     blockInlines(block).forEach((inlines) => inlineImagePaths(inlines, paths));

@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Toaster, toast } from 'sonner';
 import { setApplicationTitle } from './services/windowAdapter';
 import { AppHeader } from './components/Layout/AppHeader';
+import { OutputQualityDialog } from './components/Layout/OutputQualityDialog';
 import { DeckPickerDialog } from './components/Layout/DeckPickerDialog';
 import { Presenter } from './components/Slides/Presenter';
 import { SlidePreview } from './components/Slides/SlidePreview';
@@ -54,6 +55,7 @@ export default function App() {
   const [revealRequest, setRevealRequest] = useState<RevealRequest | null>(null);
   const [insertRequest, setInsertRequest] = useState<InsertRequest | null>(null);
   const [presenting, setPresenting] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const exportBusy = useRef(false);
   const [folderDecks, setFolderDecks] = useState<string[]>([]);
@@ -163,6 +165,8 @@ export default function App() {
   return (
     <div className="app-container">
       <AppHeader
+        canCheckOutput={!isStale}
+        onCheckOutput={() => setQualityOpen(true)}
         fontFamily={deck?.fontFamily}
         onFontFamilyChange={(font) => setHeaderAttribute('slide-font', font)}
         fileName={fileName}
@@ -190,6 +194,14 @@ export default function App() {
         onVimModeChange={(vimMode) => updatePreferences({ vimMode })}
       />
       <div ref={workspaceRef} className="app-workspace">
+        <OutputQualityDialog
+          open={qualityOpen}
+          onOpenChange={setQualityOpen}
+          deck={deck}
+          disabled={isStale}
+          directory={document_.documentDir}
+          onSelect={selectSlide}
+        />
         {showExplorer && (
           <aside className="pane-explorer" aria-label="File explorer">
             <FileExplorer
