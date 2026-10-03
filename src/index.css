@@ -621,7 +621,9 @@ body,
   cursor: none;
 }
 
-.presenter:hover {
+/* The cursor and exit button appear only while the mouse is moving (see
+   usePointerActivity), so the audience normally sees just the slide. */
+.presenter[data-pointer-active='true'] {
   cursor: default;
 }
 
@@ -640,6 +642,32 @@ body,
   background: var(--bg-header);
   color: var(--text-main);
   font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.presenter[data-pointer-active='true'] .presenter-exit,
+.presenter-exit:hover,
+.presenter-exit:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep the exit target stable while it is hovered, and discoverable on
+   touch-only devices where there is no mouse movement to reveal it. */
+@media (hover: none) {
+  .presenter-exit {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .presenter-exit {
+    transition: none;
+  }
 }
 
 /* highlight.js tokens, tuned per slide brightness */

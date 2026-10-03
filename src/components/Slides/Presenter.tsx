@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { SlideDeck } from '../../services/slideDeck';
 import { SlideView } from './SlideView';
+import { usePointerActivity } from '../../hooks/usePointerActivity';
 import { usePresentationFocus } from '../../hooks/usePresentationFocus';
 import { handlePresentationControlKey } from '../../services/presentationInput';
 
@@ -29,6 +30,7 @@ const PREVIOUS_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p
 /** Full-window slideshow: arrows/space/click to advance, Esc to leave. */
 export function Presenter({ deck, startIndex, documentDir, onExit }: PresenterProps) {
   const presenterRef = usePresentationFocus();
+  const pointerActive = usePointerActivity(presenterRef);
   const [index, setIndex] = useState(startIndex);
   const last = deck.slides.length - 1;
   const go = useCallback((next: number) => setIndex(Math.max(0, Math.min(last, next))), [last]);
@@ -82,6 +84,7 @@ export function Presenter({ deck, startIndex, documentDir, onExit }: PresenterPr
       aria-modal="true"
       aria-description="Use arrow keys to navigate. Press Escape to exit the presentation."
       aria-label={`Slide ${index + 1} of ${deck.slides.length}`}
+      data-pointer-active={pointerActive}
       onClick={onClick}
     >
       <button

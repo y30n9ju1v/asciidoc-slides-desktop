@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Presenter } from './Presenter';
 import { parseSlideDeck } from '../../services/slideDeckService';
+import { POINTER_IDLE_MS } from '../../hooks/usePointerActivity';
 
 vi.mock('./SlideView', () => ({
   SlideView: ({ index }: { index: number }) => (
@@ -15,6 +17,7 @@ vi.mock('./SlideView', () => ({
 }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ setFullscreen: async () => {} }) }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+const appCss = readFileSync('src/index.css', 'utf8');
 let root: Root;
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -78,4 +81,40 @@ it('isolates presentation input, navigates, and restores editor focus on exit', 
   await act(async () => root.render(null));
   expect(background.hasAttribute('inert')).toBe(false);
   expect(document.activeElement).toBe(editor);
+});
+
+it('hides idle presentation chrome without removing keyboard access to exit', async () => {
+  vi.useFakeTimers();
+  try {
+    const container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    const deck = await parseSlideDeck('== One');
+    const onExit = vi.fn();
+    await act(async () => root.render(<Presenter deck={deck} startIndex={0} documentDir={null} onExit={onExit} />));
+    const presenter = document.querySelector<HTMLElement>('.presenter')!;
+    expect(presenter.dataset.pointerActive).toBe('false');
+    await act(async () => presenter.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })));
+    expect(presenter.dataset.pointerActive).toBe('true');
+    await act(async () => vi.advanceTimersByTime(POINTER_IDLE_MS - 1));
+    expect(presenter.dataset.pointerActive).toBe('true');
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(presenter.dataset.pointerActive).toBe('false');
+    presenter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    const exit = document.querySelector<HTMLButtonElement>('.presenter-exit')!;
+    expect(document.activeElement).toBe(exit);
+    await act(async () => exit.click());
+    expect(onExit).toHaveBeenCalledWith(0);
+    await act(async () => root.render(null));
+  } finally {
+    vi.useRealTimers();
+  }
+  // Static CSS contracts only; real hit testing and focus-visible need a browser.
+  const rule = (selector: string) => appCss.slice(appCss.indexOf(selector)).split('}')[0];
+  expect(rule('.presenter-exit {')).toMatch(/opacity: 0;[\s\S]*pointer-events: none;/);
+  expect(rule(".presenter[data-pointer-active='true'] .presenter-exit,")).toMatch(
+    /\.presenter-exit:hover,[\s\S]*\.presenter-exit:focus-visible\s*\{[\s\S]*opacity: 1;[\s\S]*pointer-events: auto;/,
+  );
+  expect(rule('@media (hover: none)')).toMatch(/\.presenter-exit\s*\{[\s\S]*opacity: 1;[\s\S]*pointer-events: auto;/);
+  expect(rule('@media (prefers-reduced-motion: reduce)')).toMatch(/transition: none;/);
 });
