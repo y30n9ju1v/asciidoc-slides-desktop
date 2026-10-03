@@ -3,6 +3,7 @@
 :revdate: 2026-10-03
 :slide-theme: light
 :slide-style: classic
+:slide-font: Apple SD Gothic Neo
 
 AsciiDoc으로 쓰고, PPTX와 PDF로 출판합니다.
 
