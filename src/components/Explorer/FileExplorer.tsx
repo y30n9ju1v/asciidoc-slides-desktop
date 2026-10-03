@@ -131,7 +131,7 @@ export function FileExplorer({ root, onRefresh, ...actions }: FileExplorerProps)
         </button>
       </div>
       <nav className="min-h-0 flex-1 overflow-y-auto px-1 pb-2" aria-label="Files">
-        <DirectoryList directory={root} root={root} depth={0} version={version} {...actions} />
+        <DirectoryList key={root} directory={root} root={root} depth={0} version={version} {...actions} />
       </nav>
     </div>
   );

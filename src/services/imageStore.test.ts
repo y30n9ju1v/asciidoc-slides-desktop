@@ -7,9 +7,24 @@ import { deferred, renderHook } from '../test/renderHook';
 import { useImageRefresh } from '../hooks/useImageRefresh';
 
 vi.mock('@tauri-apps/plugin-fs', () => ({ readFile: vi.fn() }));
+vi.mock('./assetAdapter', () => ({ resolveDocumentAsset: async (root: string, path: string) => `${root}/${path}` }));
 beforeEach(() => {
   vi.resetAllMocks();
   clearImageCache();
+});
+
+it.each([
+  '../secret.png',
+  '/private/secret.png',
+  'https://example.com/a.png',
+  'images/../../secret.png',
+  'file:///secret.png',
+])('rejects unsafe runtime image path %s before reading', async (path) => {
+  expect(await loadImageResult('/deck', path)).toMatchObject({
+    blob: null,
+    error: expect.stringContaining('safe path'),
+  });
+  expect(readFile).not.toHaveBeenCalled();
 });
 
 it('re-reads replaced images and notifies mounted consumers', async () => {

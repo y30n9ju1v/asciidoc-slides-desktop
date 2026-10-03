@@ -1,13 +1,13 @@
 import { readFile, stat } from '@tauri-apps/plugin-fs';
-import { joinPath } from './deckAssets';
+import { resolveDocumentAsset } from './assetAdapter';
 import { blobToDataUrl } from './imageStore';
 import { isVideoSource, videoMimeType, youtubeWatchUrl } from './slideVideo';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
-export function localVideoUrl(documentDir: string, relativePath: string, start: number | null): string {
+export async function localVideoUrl(documentDir: string, relativePath: string, start: number | null): Promise<string> {
   if (!isVideoSource({ kind: 'file', relativePath })) throw new Error('Video must be inside the deck folder.');
-  return `${convertFileSrc(joinPath(documentDir, relativePath))}${start ? `#t=${start}` : ''}`;
+  return `${convertFileSrc(await resolveDocumentAsset(documentDir, relativePath))}${start ? `#t=${start}` : ''}`;
 }
 
 export function openYoutubeVideo(id: string, start: number | null): Promise<void> {
@@ -28,8 +28,8 @@ export async function loadVideoData(documentDir: string | null, relativePath: st
   if (!documentDir) return { error: 'save the deck first so videos resolve next to it' };
   if (!isVideoSource({ kind: 'file', relativePath })) return { error: 'video must be inside the deck folder' };
   if (!mime) return { error: 'unsupported video type' };
-  const path = joinPath(documentDir, relativePath);
   try {
+    const path = await resolveDocumentAsset(documentDir, relativePath);
     const info = await stat(path);
     if (info.size > MAX_EMBEDDED_VIDEO_BYTES) {
       return { error: `larger than ${MAX_EMBEDDED_VIDEO_BYTES / 1024 / 1024} MB` };

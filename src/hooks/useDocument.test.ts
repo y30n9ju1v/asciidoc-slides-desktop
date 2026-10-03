@@ -8,7 +8,17 @@ import { useDocument } from './useDocument';
 vi.mock('../services/documentFileAdapter');
 vi.mock('../services/imageStore', () => ({ clearImageCache: vi.fn() }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn() }));
-vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onCloseRequested: async () => () => {} }) }));
+const close = vi.hoisted(() => ({
+  handler: null as null | ((event: { preventDefault: () => void }) => Promise<void>),
+}));
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    onCloseRequested: async (handler: typeof close.handler) => {
+      close.handler = handler;
+      return () => {};
+    },
+  }),
+}));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -21,6 +31,50 @@ beforeEach(() => {
 });
 
 describe('document operation ownership', () => {
+  it('ignores a folder picker result after a newer document operation', async () => {
+    const hook = await renderHook(useDocument);
+    const picker = deferred<files.DeckFolder | null>();
+    vi.mocked(files.chooseDeckFolder).mockReturnValueOnce(picker.promise);
+    let pending!: Promise<string[]>;
+    await act(async () => {
+      pending = hook.current.openFolder();
+    });
+    await act(async () => hook.current.openPath('/new/deck.adoc'));
+    await act(async () => {
+      picker.resolve({ folder: '/old', decks: ['/old/one.adoc', '/old/two.adoc'] });
+      expect(await pending).toEqual([]);
+    });
+    expect(hook.current.explorerRoot).toBe('/new');
+  });
+  it('refuses to close when edits change during discard confirmation', async () => {
+    const hook = await renderHook(useDocument);
+    await act(async () => hook.current.setText('first edit'));
+    const answer = deferred<boolean>();
+    vi.mocked(ask).mockReturnValueOnce(answer.promise);
+    const event = { preventDefault: vi.fn() };
+    const pending = close.handler!(event);
+    await act(async () => hook.current.setText('new edit'));
+    answer.resolve(true);
+    await pending;
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(hook.current.text).toBe('new edit');
+  });
+
+  it('blocks duplicate close requests while a confirmation is pending', async () => {
+    const hook = await renderHook(useDocument);
+    await act(async () => hook.current.setText('edited'));
+    const answer = deferred<boolean>();
+    vi.mocked(ask).mockReturnValueOnce(answer.promise);
+    const first = { preventDefault: vi.fn() };
+    const second = { preventDefault: vi.fn() };
+    const pending = close.handler!(first);
+    await close.handler!(second);
+    expect(second.preventDefault).toHaveBeenCalledOnce();
+    expect(ask).toHaveBeenCalledOnce();
+    answer.resolve(true);
+    await pending;
+    expect(first.preventDefault).not.toHaveBeenCalled();
+  });
   it.each(['save', 'saveAs'] as const)('does not apply a late %s to another document', async (action) => {
     const hook = await renderHook(useDocument);
     await act(async () => hook.current.openPath('/A.adoc'));
@@ -132,6 +186,13 @@ describe('document operation ownership', () => {
 });
 
 describe('decks handed over by the OS', () => {
+  it('reports startup read failures instead of silently keeping the sample deck', async () => {
+    vi.mocked(files.takeLaunchDocument).mockResolvedValueOnce('/missing.adoc');
+    vi.mocked(files.readDocumentText).mockRejectedValueOnce(new Error('permission denied'));
+    const hook = await renderHook(useDocument);
+    expect(hook.current.error).toContain('permission denied');
+    expect(hook.current.path).toBeNull();
+  });
   it('opens a deck delivered while running, after asking about unsaved work', async () => {
     let deliver!: () => void;
     vi.mocked(files.onLaunchDocument).mockImplementation(async (handler) => {

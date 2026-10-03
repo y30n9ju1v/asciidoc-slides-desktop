@@ -68,6 +68,7 @@ function PreviewMessages({
       {warnings.map((warning, i) => (
         <div key={i} className="flex gap-1.5 text-[var(--color-warning)]">
           <AlertTriangle className="size-3.5 shrink-0" />
+          {warning.severity === 'error' ? 'Error: ' : 'Warning: '}
           {warning.location.line ? `Line ${warning.location.line}: ` : ''}
           {warning.message}
         </div>

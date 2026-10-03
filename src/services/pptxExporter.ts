@@ -406,6 +406,8 @@ async function loadFrameImages(deck: SlideDeck, documentDir: string | null): Pro
       frame.source.kind === 'diagram'
         ? await rasterized(await renderMermaidSvg(frame.source.code, deck.theme))
         : await loadFileImage(documentDir, frame.source.relativePath);
+    if (!image)
+      throw new Error(`Could not render image ${frame.alt}. Check the file or diagram before exporting PowerPoint.`);
     images.set(imageKey(frame), image);
   }
   return images;
@@ -428,7 +430,10 @@ async function loadDeckMedia(deck: SlideDeck, documentDir: string | null): Promi
     }
     if (video.poster && !media.posters.has(video.poster)) {
       const blob = await loadImage(documentDir, video.poster);
-      media.posters.set(video.poster, blob ? await blobToPngDataUrl(blob) : null);
+      const poster = blob ? await blobToPngDataUrl(blob) : null;
+      if (!poster)
+        throw new Error(`Could not render video poster ${video.poster}. Check the image before exporting PowerPoint.`);
+      media.posters.set(video.poster, poster);
     }
   }
   return media;

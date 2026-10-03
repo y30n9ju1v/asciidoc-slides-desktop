@@ -48,6 +48,12 @@ async function unzipText(bytes: Uint8Array): Promise<Map<string, string>> {
 }
 
 describe('buildPptx', () => {
+  it('rejects unresolved images and posters rather than exporting placeholders', async () => {
+    for (const content of ['image::missing.png[Missing]', 'video::dQw4w9WgXcQ[youtube,cover=missing.png]']) {
+      const deck = await parseSlideDeck(`== Missing\n\n${content}`);
+      await expect(buildPptx(deck, null)).rejects.toThrow('Could not render');
+    }
+  });
   it('writes editable slides with bullets, tables, and speaker notes', async () => {
     const deck = await parseSlideDeck(DECK);
     const files = await unzipText(await buildPptx(deck, null));

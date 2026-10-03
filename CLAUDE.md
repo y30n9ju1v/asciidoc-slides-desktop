@@ -2,6 +2,12 @@
 
 Development, refactoring, and review must follow [DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md), adapted from the sibling AsciiDoc Pages project. Preserve the layout rules below when fixing behavior.
 
+Read the relevant local guide for the task: [TECH_STACK.md](./TECH_STACK.md) for architecture,
+[SAFE_DOCUMENT_SPEC.md](./SAFE_DOCUMENT_SPEC.md) for model/output changes,
+[RELIABILITY_TESTING.md](./RELIABILITY_TESTING.md) for regression coverage, and
+[MACOS_RELEASE_GUIDE.md](./MACOS_RELEASE_GUIDE.md) for release preparation.
+These are adapted to Slides; do not assume Pages-only features or scripts exist here.
+
 ## UI layout is locked
 
 The owner is very happy with the current UI and asked that it not be changed. Do not rearrange,

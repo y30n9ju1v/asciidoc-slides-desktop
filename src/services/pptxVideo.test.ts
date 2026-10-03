@@ -5,6 +5,7 @@ import { parseSlideDeck } from './slideDeckService';
 import { MAX_EMBEDDED_VIDEO_BYTES } from './videoStore';
 
 vi.mock('@tauri-apps/plugin-fs', () => ({ readFile: vi.fn(), stat: vi.fn() }));
+vi.mock('./assetAdapter', () => ({ resolveDocumentAsset: async (root: string, path: string) => `${root}/${path}` }));
 
 beforeEach(() => {
   vi.clearAllMocks();

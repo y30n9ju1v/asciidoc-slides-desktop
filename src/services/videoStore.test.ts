@@ -10,7 +10,7 @@ it.each(['../secret.mp4', '/tmp/secret.mp4', 'https://example.com/clip.mp4'])(
   'rejects unsafe runtime paths before any IO: %s',
   async (path) => {
     expect(await loadVideoData('/deck', path)).toHaveProperty('error');
-    expect(() => localVideoUrl('/deck', path, null)).toThrow();
+    await expect(localVideoUrl('/deck', path, null)).rejects.toThrow();
     expect(stat).not.toHaveBeenCalled();
     expect(readFile).not.toHaveBeenCalled();
   },

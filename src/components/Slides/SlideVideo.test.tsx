@@ -6,7 +6,7 @@ import { parseSlideDeck } from '../../services/slideDeckService';
 import { localVideoUrl, openYoutubeVideo } from '../../services/videoStore';
 
 vi.mock('../../services/videoStore', () => ({
-  localVideoUrl: vi.fn(() => 'asset://clip.mp4'),
+  localVideoUrl: vi.fn(async () => 'asset://clip.mp4'),
   openYoutubeVideo: vi.fn(),
 }));
 vi.mock('./useSlideImageUrl', () => ({ useSlideImageUrl: () => ({ url: null, error: null, loading: false }) }));

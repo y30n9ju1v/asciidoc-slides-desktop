@@ -12,6 +12,9 @@ import sampleDeck from '../../../samples/sample-deck.adoc?raw';
 const slideCss = readFileSync('src/index.css', 'utf8');
 
 vi.mock('@tauri-apps/plugin-fs', () => ({ readFile: vi.fn() }));
+vi.mock('../../services/assetAdapter', () => ({
+  resolveDocumentAsset: async (root: string, path: string) => `${root}/${path}`,
+}));
 vi.mock('../../services/mermaidRenderer', () => ({ renderMermaidSvg: vi.fn() }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root;

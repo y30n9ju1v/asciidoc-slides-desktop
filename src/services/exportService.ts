@@ -27,7 +27,8 @@ export async function buildPdfRequest(deck: SlideDeck, documentDir: string | nul
   const diagrams: { path: string; svg: string }[] = [];
   for (const code of deckDiagramSources(deck)) {
     const svg = await renderMermaidSvg(code, deck.theme);
-    if (svg) diagrams.push({ path: diagramAssetPath(code), svg });
+    if (!svg) throw new Error('Could not render a Mermaid diagram. Fix the diagram before exporting PDF.');
+    diagrams.push({ path: diagramAssetPath(code), svg });
   }
   return { deck, documentRoot: documentDir, assets: deckImagePaths(deck), diagrams };
 }

@@ -1,11 +1,14 @@
 //! `export_slides_pdf`: SlideDeck JSON -> Typst source (slide_writer.rs) ->
 //! PDF bytes -> the user's chosen file. Typst source is generated only here,
 //! from validated data; the WebView never supplies it.
+use crate::asset_paths::{is_plain_relative, resolve_within_root};
 use crate::slide_deck::{SlidePdfRequest, SUPPORTED_DECK_VERSION};
 use crate::slide_writer::write_slide_deck;
 use serde::Serialize;
 use std::collections::HashSet;
-use std::path::{Component, Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri_plugin_fs::FsExt;
 use typst_as_lib::typst_kit_options::TypstKitFontOptions;
 use typst_as_lib::TypstEngine;
@@ -18,6 +21,7 @@ const MAX_ASSET_COUNT: usize = 300;
 const MAX_TOTAL_ASSET_BYTES: usize = 200 * 1024 * 1024;
 const MAX_DIAGRAM_SVG_BYTES: usize = 5 * 1024 * 1024;
 const COMPILER_THREAD_STACK_BYTES: usize = 32 * 1024 * 1024;
+static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 static NOTO_SANS_KR_REGULAR: &[u8] = include_bytes!("../assets/fonts/NotoSansKR-Regular.otf");
 static NOTO_SANS_KR_BOLD: &[u8] = include_bytes!("../assets/fonts/NotoSansKR-Bold.otf");
@@ -101,41 +105,73 @@ fn parse_request(json: &str) -> Result<SlidePdfRequest, ExportError> {
     Ok(request)
 }
 
-/// A document-relative path with only normal components - no root, no `..`.
-fn is_plain_relative(path: &str) -> bool {
-    let path = Path::new(path);
-    !path.as_os_str().is_empty() && path.components().all(|c| matches!(c, Component::Normal(_)))
-}
-
-/// Resolves `relative` under `root`, following symlinks, and refuses anything
-/// that lands outside the canonical root.
-fn resolve_within_root(root: &Path, relative: &str) -> Option<PathBuf> {
-    if !is_plain_relative(relative) {
-        return None;
-    }
-    let canonical_root = root.canonicalize().ok()?;
-    let resolved = canonical_root.join(relative).canonicalize().ok()?;
-    resolved.starts_with(&canonical_root).then_some(resolved)
-}
-
 type LoadedAssets = Vec<(String, Vec<u8>)>;
 
-/// Missing or unreadable images are skipped - the writer renders a visible
-/// placeholder. `root` must already be trusted (see `trusted_root`).
+/// Missing, denied or unreadable referenced images fail export instead of
+/// silently publishing placeholders. `root` must already be trusted.
 fn load_assets(
     root: Option<&Path>,
     request: &SlidePdfRequest,
+    allowed: &impl Fn(&Path) -> bool,
 ) -> Result<LoadedAssets, ExportError> {
     let mut loaded = Vec::new();
     let mut total = 0usize;
+    if root.is_none() && !request.assets.is_empty() {
+        return Err(ExportError::new(
+            "asset-not-allowed",
+            "Choose the deck folder before exporting its images.",
+        ));
+    }
     if let Some(root) = root {
         for relative in &request.assets {
-            let Some(path) = resolve_within_root(root, relative) else {
-                continue;
-            };
-            let Ok(bytes) = std::fs::read(&path) else {
-                continue;
-            };
+            let path = resolve_within_root(root, relative).ok_or_else(|| {
+                ExportError::new(
+                    "asset-unavailable",
+                    format!("Image {relative} is missing or outside the deck folder."),
+                )
+            })?;
+            if !allowed(&root.join(relative)) || !allowed(&path) {
+                return Err(ExportError::new(
+                    "asset-not-allowed",
+                    "A slide image is outside the selected filesystem scope.",
+                ));
+            }
+            if !path.is_file() {
+                return Err(ExportError::new(
+                    "asset-unavailable",
+                    format!("Image {relative} is not a regular file."),
+                ));
+            }
+            let file = std::fs::File::open(&path).map_err(|err| {
+                ExportError::new(
+                    "asset-unavailable",
+                    format!("Could not read image {relative}: {err}"),
+                )
+            })?;
+            let info = file
+                .metadata()
+                .map_err(|err| ExportError::new("asset-unavailable", err.to_string()))?;
+            if !info.is_file() {
+                return Err(ExportError::new(
+                    "asset-unavailable",
+                    format!("Image {relative} is not a regular file."),
+                ));
+            }
+            if info.len() > (MAX_TOTAL_ASSET_BYTES - total) as u64 {
+                return Err(ExportError::new(
+                    "assets-too-large",
+                    "The slide images are too large to export.",
+                ));
+            }
+            let mut bytes = Vec::new();
+            file.take((MAX_TOTAL_ASSET_BYTES - total + 1) as u64)
+                .read_to_end(&mut bytes)
+                .map_err(|err| {
+                    ExportError::new(
+                        "asset-unavailable",
+                        format!("Could not read image {relative}: {err}"),
+                    )
+                })?;
             total += bytes.len();
             if total > MAX_TOTAL_ASSET_BYTES {
                 return Err(ExportError::new(
@@ -152,6 +188,13 @@ fn load_assets(
             && diagram.path.ends_with(".svg")
             && is_plain_relative(&diagram.path);
         if is_diagram_path && diagram.svg.len() <= MAX_DIAGRAM_SVG_BYTES {
+            total += diagram.svg.len();
+            if total > MAX_TOTAL_ASSET_BYTES {
+                return Err(ExportError::new(
+                    "assets-too-large",
+                    "The slide images are too large to export.",
+                ));
+            }
             loaded.push((diagram.path.clone(), diagram.svg.as_bytes().to_vec()));
         }
     }
@@ -171,8 +214,12 @@ fn trusted_root<R: tauri::Runtime>(
         .map(PathBuf::from)
 }
 
-fn build_pdf_from(request: &SlidePdfRequest, root: Option<&Path>) -> Result<Vec<u8>, ExportError> {
-    let assets = load_assets(root, request)?;
+fn build_pdf_from(
+    request: &SlidePdfRequest,
+    root: Option<&Path>,
+    allowed: &impl Fn(&Path) -> bool,
+) -> Result<Vec<u8>, ExportError> {
+    let assets = load_assets(root, request, allowed)?;
     let asset_paths: HashSet<String> = assets.iter().map(|(path, _)| path.clone()).collect();
     let source = write_slide_deck(&request.deck, &asset_paths)
         .map_err(|err| ExportError::new("deck-too-deep", err.0))?;
@@ -220,13 +267,47 @@ fn build_pdf<R: tauri::Runtime>(
     request_json: &str,
 ) -> Result<Vec<u8>, ExportError> {
     let request = parse_request(request_json)?;
-    build_pdf_from(&request, trusted_root(app, &request).as_deref())
+    build_pdf_from(&request, trusted_root(app, &request).as_deref(), &|path| {
+        app.fs_scope().is_allowed(path)
+    })
+}
+
+/// Writes and syncs `bytes` into a file that must not exist yet. A partial
+/// file is removed on failure: it was created here, so nothing is lost.
+fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    let result = file.write_all(bytes).and_then(|_| file.sync_all());
+    if result.is_err() {
+        let _ = std::fs::remove_file(path);
+    }
+    result
+}
+
+/// The path taken when no sibling temporary file can be created: a new PDF is
+/// created exclusively; an existing one is never overwritten in place.
+fn write_without_temporary(destination: &Path, bytes: &[u8]) -> Result<(), ExportError> {
+    if std::fs::symlink_metadata(destination).is_ok() {
+        return Err(ExportError::new(
+            "write-failed",
+            "Could not create a safe temporary file next to the existing PDF, so it was left unchanged. Save under a new file name or in a writable folder.",
+        ));
+    }
+    write_new_file(destination, bytes)
+        .map_err(|err| ExportError::new("write-failed", format!("Could not save the PDF: {err}")))
 }
 
 /// Writes through a sibling temporary file so a failed export never leaves a
-/// truncated PDF at the destination. Under the macOS App Sandbox only the
-/// file the user picked is writable, not its folder, so when the temporary
-/// file cannot be created this falls back to writing the destination directly.
+/// truncated PDF at the destination, and never falls back to overwriting an
+/// existing PDF in place.
+///
+/// The macOS App Sandbox grants only the file picked in the save panel, not
+/// its folder, so the sibling temporary file cannot be created there. When the
+/// destination does not exist yet there is no original to protect, so the PDF
+/// is created directly (exclusively); replacing an existing PDF still requires
+/// a writable folder.
 fn write_atomically(destination: &Path, bytes: &[u8]) -> Result<(), ExportError> {
     let io = |err: std::io::Error| {
         ExportError::new("write-failed", format!("Could not save the PDF: {err}"))
@@ -234,12 +315,24 @@ fn write_atomically(destination: &Path, bytes: &[u8]) -> Result<(), ExportError>
     let parent = destination
         .parent()
         .ok_or_else(|| ExportError::new("write-failed", "The PDF destination has no folder."))?;
-    let temporary = parent.join(format!(".asciidoc-slides-{}.pdf.tmp", std::process::id()));
-    if std::fs::write(&temporary, bytes).is_err() {
-        let _ = std::fs::remove_file(&temporary);
-        return std::fs::write(destination, bytes).map_err(io);
-    }
-    std::fs::rename(&temporary, destination).map_err(|err| {
+    let temporary = parent.join(format!(
+        ".asciidoc-slides-{}-{}.pdf.tmp",
+        std::process::id(),
+        EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+    else {
+        return write_without_temporary(destination, bytes);
+    };
+    let result = (|| {
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, destination)
+    })();
+    result.map_err(|err| {
         let _ = std::fs::remove_file(&temporary);
         io(err)
     })
@@ -253,7 +346,9 @@ pub async fn export_slides_pdf<R: tauri::Runtime>(
     request_json: String,
     output_path: String,
 ) -> Result<(), ExportError> {
-    if !app.fs_scope().is_allowed(&output_path) {
+    let destination = crate::document_store::canonical_destination(Path::new(&output_path))
+        .map_err(|err| ExportError::new("write-failed", err))?;
+    if !app.fs_scope().is_allowed(&output_path) || !app.fs_scope().is_allowed(&destination) {
         return Err(ExportError::new(
             "output-not-allowed",
             "Choose where to save the PDF first.",
@@ -274,13 +369,63 @@ pub async fn export_slides_pdf<R: tauri::Runtime>(
     })
     .await
     .map_err(|err| ExportError::new("compiler-task", err.to_string()))??;
-    write_atomically(Path::new(&output_path), &bytes)
+    write_atomically(&destination, &bytes)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::slide_deck::SlidePdfRequest;
+
+    #[test]
+    fn asset_reads_respect_per_file_scope_and_size_limits() {
+        let root = std::env::temp_dir().join(format!("slides-assets-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("private.png");
+        std::fs::write(&path, b"private").unwrap();
+        let mut parsed = parse_request(&request("[]")).unwrap();
+        parsed.assets = vec!["private.png".into()];
+        let canonical = path.canonicalize().unwrap();
+        let denied = load_assets(Some(&root), &parsed, &|p| p != canonical).unwrap_err();
+        assert_eq!(denied.code, "asset-not-allowed");
+        let file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.set_len(MAX_TOTAL_ASSET_BYTES as u64 + 1).unwrap();
+        assert_eq!(
+            load_assets(Some(&root), &parsed, &|_| true)
+                .unwrap_err()
+                .code,
+            "assets-too-large"
+        );
+        drop(file);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn export_rejects_output_symlink_to_a_denied_destination() {
+        let root = std::env::temp_dir().join(format!("slides-output-link-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let target = root.join("private.pdf");
+        let link = root.join("output.pdf");
+        std::fs::write(&target, b"keep").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_fs::init())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        app.fs_scope().allow_directory(&root, true).unwrap();
+        app.fs_scope()
+            .forbid_file(target.canonicalize().unwrap())
+            .unwrap();
+        let result = tauri::async_runtime::block_on(export_slides_pdf(
+            app.handle().clone(),
+            request("[]"),
+            link.to_string_lossy().into_owned(),
+        ));
+        assert_eq!(result.unwrap_err().code, "output-not-allowed");
+        assert_eq!(std::fs::read(&target).unwrap(), b"keep");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     fn request(slides: &str) -> String {
         format!(
@@ -391,7 +536,7 @@ mod tests {
         let json = std::fs::read_to_string(std::env::var("SLIDES_REQUEST").unwrap()).unwrap();
         let request = parse_request(&json).unwrap();
         let root = request.document_root.clone().map(PathBuf::from);
-        let pdf = build_pdf_from(&request, root.as_deref()).unwrap();
+        let pdf = build_pdf_from(&request, root.as_deref(), &|_| true).unwrap();
         std::fs::write(std::env::var("SLIDES_PDF_OUT").unwrap(), pdf).unwrap();
     }
 
@@ -459,7 +604,27 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn writes_directly_when_the_folder_is_not_writable() {
+    fn creates_a_new_pdf_but_never_overwrites_without_a_temporary_file() {
+        let root = std::env::temp_dir().join(format!("slides-no-temp-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let fresh = root.join("new.pdf");
+        write_without_temporary(&fresh, b"%PDF-new").unwrap();
+        assert_eq!(std::fs::read(&fresh).unwrap(), b"%PDF-new");
+        let existing = root.join("old.pdf");
+        std::fs::write(&existing, b"old").unwrap();
+        assert_eq!(
+            write_without_temporary(&existing, b"%PDF-new")
+                .unwrap_err()
+                .code,
+            "write-failed"
+        );
+        assert_eq!(std::fs::read(&existing).unwrap(), b"old");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn preserves_existing_pdf_when_the_folder_is_not_writable() {
         use std::os::unix::fs::PermissionsExt;
         let root = std::env::temp_dir().join(format!("slides-readonly-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
@@ -468,8 +633,8 @@ mod tests {
         std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o500)).unwrap();
         let result = write_atomically(&output, b"%PDF-new");
         std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
-        result.unwrap();
-        assert_eq!(std::fs::read(&output).unwrap(), b"%PDF-new");
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&output).unwrap(), b"old");
         assert_eq!(
             std::fs::read_dir(&root).unwrap().count(),
             1,

@@ -62,6 +62,9 @@ export const AsciidocEditor: React.FC<AsciidocEditorProps> = ({
   const currentDocumentId = useRef(documentId);
   const vimSubModeRef = useRef<string>('normal');
   const [highlightingReady, setHighlightingReady] = useState(false);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [setupAttempt, setSetupAttempt] = useState(0);
+  const [vimError, setVimError] = useState<string | null>(null);
   const cursorLineRef = useRef(onCursorLineChange);
   useEffect(() => {
     cursorLineRef.current = onCursorLineChange;
@@ -71,13 +74,18 @@ export const AsciidocEditor: React.FC<AsciidocEditorProps> = ({
 
   useEffect(() => {
     let cancelled = false;
-    ensureAsciidocHighlighting().then(() => {
-      if (!cancelled) setHighlightingReady(true);
-    });
+    ensureAsciidocHighlighting().then(
+      () => {
+        if (!cancelled) setHighlightingReady(true);
+      },
+      (error: unknown) => {
+        if (!cancelled) setInitializationError(String(error));
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setupAttempt]);
 
   // Update Monaco theme when colorMode changes
   useEffect(() => {
@@ -198,6 +206,7 @@ export const AsciidocEditor: React.FC<AsciidocEditorProps> = ({
     void import('monaco-vim')
       .then(({ initVimMode }) => {
         if (cancelled) return;
+        setVimError(null);
         remapSub = editor.onKeyDown((e) => {
           if (vimSubModeRef.current !== 'insert') {
             remapHangulKeydown(e.browserEvent);
@@ -215,7 +224,7 @@ export const AsciidocEditor: React.FC<AsciidocEditorProps> = ({
       .catch((error: unknown) => {
         if (!cancelled) {
           IME.enable();
-          console.error('Could not enable Vim mode:', error);
+          setVimError(`Could not enable Vim mode: ${String(error)}. Turn Vim mode off and on to retry.`);
         }
       });
 
@@ -256,6 +265,26 @@ export const AsciidocEditor: React.FC<AsciidocEditorProps> = ({
       }}
     >
       <div ref={containerRef} style={{ flex: 1, minHeight: 0 }} />
+      {initializationError && (
+        <div role="alert" className="p-3 text-sm text-[var(--destructive)]">
+          Could not initialize the editor: {initializationError}. Your document has not been changed.
+          <button
+            type="button"
+            className="ml-2 underline"
+            onClick={() => {
+              setInitializationError(null);
+              setSetupAttempt((attempt) => attempt + 1);
+            }}
+          >
+            Retry editor
+          </button>
+        </div>
+      )}
+      {vimMode && vimError && (
+        <div role="alert" className="p-3 text-sm text-[var(--destructive)]">
+          {vimError}
+        </div>
+      )}
       {vimMode && <div ref={statusBarRef} className="vim-status-bar" />}
     </div>
   );

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Toaster, toast } from 'sonner';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { setApplicationTitle } from './services/windowAdapter';
 import { AppHeader } from './components/Layout/AppHeader';
 import { DeckPickerDialog } from './components/Layout/DeckPickerDialog';
 import { Presenter } from './components/Slides/Presenter';
@@ -45,6 +45,9 @@ function reportError(action: string) {
 export default function App() {
   const [preferences, updatePreferences] = useAppPreferences();
   const document_ = useDocument();
+  useEffect(() => {
+    if (document_.error) toast.error(document_.error);
+  }, [document_.error]);
   const { deck, error: parseError, isStale, isParsing } = useSlideDeck(document_.text, document_.id);
   const refreshImages = useImageRefresh();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -89,14 +92,7 @@ export default function App() {
 
   useEffect(() => {
     const title = `${fileName}${document_.isDirty ? ' •' : ''} — AsciiDoc Slides`;
-    document.title = title;
-    try {
-      void getCurrentWindow()
-        .setTitle(title)
-        .catch(() => undefined);
-    } catch {
-      // Plain browser preview.
-    }
+    void setApplicationTitle(title);
   }, [fileName, document_.isDirty]);
 
   const runExport = useCallback(

@@ -1,3 +1,4 @@
+mod asset_paths;
 mod document_store;
 mod fs_scope_commands;
 // Shared SafeDocument contract; this app reads only the block vocabulary.
@@ -23,6 +24,7 @@ pub fn run() {
         .manage(fs_scope_commands::LaunchDocument::from_args())
         .invoke_handler(tauri::generate_handler![
             document_store::save_document_atomic,
+            asset_paths::resolve_deck_asset,
             fs_scope_commands::choose_document_to_open,
             fs_scope_commands::choose_deck_folder,
             fs_scope_commands::take_launch_document,

@@ -47,6 +47,7 @@ export function useDocument() {
   const [state, setState] = useState<DocumentState>({ id: 0, path: null, text: STARTER_DECK, baseline: STARTER_DECK });
   /** A folder picked with "Open folder"; the explorer shows it instead of the deck's own folder. */
   const [folder, setFolder] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const isDirty = state.text !== state.baseline;
   const stateRef = useRef(state);
   const transition = useRef(0);
@@ -112,8 +113,10 @@ export function useDocument() {
    * the caller to choose from (then passed to `openPath`).
    */
   const openFolder = useCallback(async (): Promise<string[]> => {
+    const sequence = ++transition.current;
+    const original = stateRef.current;
     const picked = await chooseDeckFolder();
-    if (!picked) return [];
+    if (!picked || sequence !== transition.current || original !== stateRef.current) return [];
     setFolder(picked.folder);
     if (picked.decks.length === 0)
       throw new Error('No .adoc files directly in that folder. Pick one from the file tree.');
@@ -156,7 +159,7 @@ export function useDocument() {
     const ticket = { sequence: transition.current, document: stateRef.current };
     takeLaunchDocument()
       .then((path) => (path && isCurrent(ticket) ? loadPath(path, ticket) : undefined))
-      .catch(() => undefined);
+      .catch((reason: unknown) => setError(`Could not open the launch document: ${String(reason)}`));
   }, [loadPath, isCurrent]);
 
   // A deck handed over while running (macOS "Open With") asks about unsaved work first.
@@ -166,7 +169,9 @@ export function useDocument() {
     onLaunchDocument(() => {
       void takeLaunchDocument()
         .then((path) => (path ? openDeckFromTree(path) : undefined))
-        .catch(() => undefined);
+        .catch((reason: unknown) => {
+          if (!disposed) setError(`Could not open the requested document: ${String(reason)}`);
+        });
     })
       .then((dispose) => {
         if (disposed) dispose();
@@ -183,11 +188,33 @@ export function useDocument() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
+    let confirming = false;
     try {
       void getCurrentWindow()
         .onCloseRequested(async (event) => {
+          if (confirming || saving.current) {
+            event.preventDefault();
+            return;
+          }
           const current = stateRef.current;
-          if (current.text !== current.baseline && !(await confirmDiscard())) event.preventDefault();
+          const sequence = transition.current;
+          if (current.text === current.baseline) return;
+          confirming = true;
+          try {
+            const allowed = await confirmDiscard();
+            if (
+              !allowed ||
+              disposed ||
+              saving.current ||
+              current !== stateRef.current ||
+              sequence !== transition.current
+            )
+              event.preventDefault();
+          } catch {
+            event.preventDefault();
+          } finally {
+            confirming = false;
+          }
         })
         .then((dispose) => {
           if (disposed) dispose();
@@ -205,6 +232,7 @@ export function useDocument() {
 
   return {
     id: state.id,
+    error,
     path: state.path,
     documentDir: state.path ? directoryOf(state.path) : null,
     /** The folder shown in the file tree. */

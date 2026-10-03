@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Wires up pointer-driven resizing for mouse, trackpad, Apple Pencil, and
@@ -6,32 +6,45 @@ import { useRef } from 'react';
  * state from the latest render without continually re-registering handlers.
  */
 export function useDragResize(onDrag: (moveEvent: MouseEvent) => void) {
-  const isDragging = useRef(false);
+  const cleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => cleanup.current?.(), []);
 
   const startDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    cleanup.current?.();
     event.preventDefault();
-    isDragging.current = true;
+    const target = event.currentTarget;
+    const pointerId = event.pointerId;
+    const previous = { cursor: document.body.style.cursor, userSelect: document.body.style.userSelect };
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-    event.currentTarget.setPointerCapture(event.pointerId);
+    target.setPointerCapture(pointerId);
 
     const onPointerMove = (moveEvent: PointerEvent) => {
-      if (!isDragging.current) return;
+      if (moveEvent.pointerId !== pointerId) return;
       onDrag(moveEvent);
     };
 
     const finishDrag = () => {
-      isDragging.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      document.body.style.cursor = previous.cursor;
+      document.body.style.userSelect = previous.userSelect;
       window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', finishDrag);
-      window.removeEventListener('pointercancel', finishDrag);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerEnd);
+      target.removeEventListener('lostpointercapture', finishDrag);
+      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+      cleanup.current = null;
     };
 
+    const onPointerEnd = (endEvent: PointerEvent) => {
+      if (endEvent.pointerId === pointerId) finishDrag();
+    };
+    cleanup.current = finishDrag;
+
     window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', finishDrag);
-    window.addEventListener('pointercancel', finishDrag);
+    window.addEventListener('pointerup', onPointerEnd);
+    window.addEventListener('pointercancel', onPointerEnd);
+    target.addEventListener('lostpointercapture', finishDrag);
   };
 
   return startDrag;

@@ -1,5 +1,7 @@
 import { readFile } from '@tauri-apps/plugin-fs';
+import { resolveSafeAssetRef } from '../../packages/asciidoc-typst/typescript/src';
 import { imageMimeType, joinPath } from './deckAssets';
+import { resolveDocumentAsset } from './assetAdapter';
 
 /**
  * Reads document-relative images through the fs plugin, whose scope only
@@ -36,11 +38,17 @@ async function readImage(absolutePath: string): Promise<ImageResult> {
 }
 
 export function loadImageResult(documentDir: string | null, relativePath: string): Promise<ImageResult> {
+  const asset = typeof relativePath === 'string' ? resolveSafeAssetRef(relativePath) : null;
+  if (asset?.kind !== 'document-relative' || asset.relativePath !== relativePath) {
+    return Promise.resolve({ blob: null, error: 'image must be a safe path inside the deck folder' });
+  }
   if (!documentDir) return Promise.resolve({ blob: null, error: 'save the deck first so images resolve next to it' });
   const absolutePath = joinPath(documentDir, relativePath);
   let pending = cache.get(absolutePath);
   if (!pending) {
-    pending = readImage(absolutePath);
+    pending = resolveDocumentAsset(documentDir, relativePath)
+      .then(readImage)
+      .catch((error: unknown) => ({ blob: null, error: String(error) }));
     cache.set(absolutePath, pending);
   }
   return pending;

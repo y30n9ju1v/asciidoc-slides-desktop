@@ -2,7 +2,8 @@ import { useState, type CSSProperties, type MouseEvent } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
 import type { SlideVideo as SlideVideoModel } from '../../services/slideDeck';
 import { isVideoSource, youtubeEmbedUrl } from '../../services/slideVideo';
-import { localVideoUrl, openYoutubeVideo } from '../../services/videoStore';
+import { openYoutubeVideo } from '../../services/videoStore';
+import { useLocalVideoUrl } from '../../hooks/useLocalVideoUrl';
 import { useSlideAssets } from './SlideAssetsContext';
 import { useSlideImageUrl } from './useSlideImageUrl';
 
@@ -50,18 +51,21 @@ function LocalPlayer({ video, relativePath }: { video: SlideVideoModel; relative
   const [failed, setFailed] = useState(false);
   const { documentDir } = useSlideAssets();
   const poster = useSlideImageUrl(posterRef(video));
+  const source = useLocalVideoUrl(documentDir, relativePath, video.start);
   if (!documentDir) return <div role="alert">Save the deck beside its video before playing.</div>;
-  if (failed)
+  if (failed || source.error)
     return (
-      <div role="alert">Could not play {relativePath}. Check that the file exists and its codec is supported.</div>
+      <div role="alert">
+        Could not play {relativePath}. {source.error ?? 'Check that the file exists and its codec is supported.'}
+      </div>
     );
   // The asset protocol streams the file in ranges instead of loading it into memory.
-  const source = localVideoUrl(documentDir, relativePath, video.start);
+  if (!source.url) return <div role="status">Loading video…</div>;
   return (
     <video
       className="slide-video-frame"
       aria-label={videoLabel(video)}
-      src={source}
+      src={source.url}
       poster={poster.url ?? undefined}
       controls
       tabIndex={0}

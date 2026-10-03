@@ -25,7 +25,10 @@ export function ensureAsciidocHighlighting(): Promise<void> {
       // Notion/Obsidian-style "/" snippet menu (table, admonitions, mermaid,
       // math, source blocks, ...) - see slashCommands.ts.
       registerAsciidocSlashCommands(asciidocLanguageId);
-    })();
+    })().catch((error: unknown) => {
+      setupPromise = null;
+      throw error;
+    });
   }
   return setupPromise;
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { setPresentationFullscreen } from '../../services/windowAdapter';
 import type { SlideDeck } from '../../services/slideDeck';
 import { SlideView } from './SlideView';
 import { usePointerActivity } from '../../hooks/usePointerActivity';
@@ -12,16 +12,6 @@ interface PresenterProps {
   startIndex: number;
   documentDir: string | null;
   onExit: (lastIndex: number) => void;
-}
-
-async function setFullscreen(enabled: boolean): Promise<void> {
-  try {
-    await getCurrentWindow().setFullscreen(enabled);
-  } catch {
-    // Plain browser preview: fall back to the Fullscreen API.
-    if (enabled) await document.documentElement.requestFullscreen?.().catch(() => undefined);
-    else if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
-  }
 }
 
 const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter', 'n']);
@@ -36,8 +26,8 @@ export function Presenter({ deck, startIndex, documentDir, onExit }: PresenterPr
   const go = useCallback((next: number) => setIndex(Math.max(0, Math.min(last, next))), [last]);
 
   useEffect(() => {
-    void setFullscreen(true);
-    return () => void setFullscreen(false);
+    void setPresentationFullscreen(true);
+    return () => void setPresentationFullscreen(false);
   }, []);
 
   // Clicking into an embedded player (YouTube) moves keyboard focus into its

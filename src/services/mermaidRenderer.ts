@@ -1,4 +1,5 @@
 import { isDarkSlideTheme, type SlideTheme } from './slideThemes';
+import DOMPurify from 'dompurify';
 
 /**
  * Renders Mermaid sources to standalone SVG. Labels use SVG <text> rather
@@ -16,19 +17,22 @@ function loadMermaid() {
 }
 
 async function render(code: string, dark: boolean): Promise<string | null> {
-  const mermaid = await loadMermaid();
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    theme: dark ? 'dark' : 'default',
-    htmlLabels: false,
-    flowchart: { htmlLabels: false },
-    fontFamily: "'Noto Sans KR', sans-serif",
-  });
   const id = `slide-mermaid-${renderCounter++}`;
   try {
+    const mermaid = await loadMermaid();
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: dark ? 'dark' : 'default',
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      fontFamily: "'Noto Sans KR', sans-serif",
+    });
     const { svg } = await mermaid.render(id, code);
-    return svg;
+    return DOMPurify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      FORBID_TAGS: ['foreignObject', 'a'],
+    });
   } catch {
     document.getElementById(id)?.remove();
     document.getElementById(`d${id}`)?.remove();

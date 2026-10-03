@@ -4,6 +4,7 @@ import { chooseExportFile, confirmExportWarnings, writeBinaryFile } from './docu
 import { buildPptx } from './pptxExporter';
 import { parseSlideDeck } from './slideDeckService';
 import { clearImageCache } from './imageStore';
+import { renderMermaidSvg } from './mermaidRenderer';
 import { exportDocument } from './exportService';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
@@ -41,6 +42,18 @@ it('does not export an older preview when parsing fails', async () => {
   );
   expect(chooseExportFile).not.toHaveBeenCalled();
   expect(buildPptx).not.toHaveBeenCalled();
+});
+
+it('does not report a successful PDF when a diagram cannot render', async () => {
+  vi.mocked(renderMermaidSvg).mockResolvedValueOnce(null);
+  await expect(
+    exportDocument('pdf', {
+      text: '== Diagram\n\n[source,mermaid]\n----\ngraph TD\n A --> B\n----',
+      path: null,
+      documentDir: null,
+    }),
+  ).rejects.toThrow('Mermaid');
+  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('lets users cancel a lossy PPTX before choosing or writing an output', async () => {

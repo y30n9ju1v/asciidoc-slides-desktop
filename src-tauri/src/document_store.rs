@@ -60,7 +60,7 @@ fn replace_document(path: &Path, content: &str, expected: Option<&str>) -> Resul
     result.map_err(|e| e.to_string())
 }
 
-fn canonical_destination(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn canonical_destination(path: &Path) -> Result<PathBuf, String> {
     if fs::symlink_metadata(path).is_ok() {
         return path.canonicalize().map_err(|e| e.to_string());
     }
