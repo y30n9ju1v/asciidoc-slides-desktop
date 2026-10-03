@@ -10,6 +10,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri_plugin_fs::FsExt;
+use typst::World;
 use typst_as_lib::typst_kit_options::TypstKitFontOptions;
 use typst_as_lib::TypstEngine;
 use typst_layout::PagedDocument;
@@ -214,22 +215,23 @@ fn build_pdf_from(
     root: Option<&Path>,
     allowed: &impl Fn(&Path) -> bool,
 ) -> Result<Vec<u8>, ExportError> {
-    if let Some(family) = &request.deck.font_family {
-        if !typst_kit::fonts::system().any(|(_, info)| info.family.eq_ignore_ascii_case(family)) {
-            return Err(ExportError::new(
-                "font-unavailable",
-                "The selected slide font is not installed or readable. Choose another system font.",
-            ));
-        }
-    }
     let assets = load_assets(root, request, allowed)?;
     let asset_paths: HashSet<String> = assets.iter().map(|(path, _)| path.clone()).collect();
     let source = write_slide_deck(&request.deck, &asset_paths)
         .map_err(|err| ExportError::new("deck-too-deep", err.0))?;
-    compile_pdf(source, &assets)
+    compile_pdf_with_font(source, &assets, request.deck.font_family.as_deref())
 }
 
+#[cfg(test)]
 fn compile_document(source: String, assets: &LoadedAssets) -> Result<PagedDocument, ExportError> {
+    compile_document_with_font(source, assets, None)
+}
+
+fn compile_document_with_font(
+    source: String,
+    assets: &LoadedAssets,
+    selected_family: Option<&str>,
+) -> Result<PagedDocument, ExportError> {
     // Use installed fonts only; output may vary between machines.
     let engine = TypstEngine::builder()
         .main_file(source)
@@ -240,6 +242,10 @@ fn compile_document(source: String, assets: &LoadedAssets) -> Result<PagedDocume
                 .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
         )
         .build();
+    // Inspect the engine's existing font book; never scan the filesystem again.
+    engine
+        .with_world(|world| validate_selected_font(world, selected_family))
+        .map_err(|err| ExportError::new("typst-compile-failed", err.to_string()))??;
     engine.compile().output.map_err(|err| {
         ExportError::new(
             "typst-compile-failed",
@@ -248,8 +254,36 @@ fn compile_document(source: String, assets: &LoadedAssets) -> Result<PagedDocume
     })
 }
 
+fn validate_selected_font(world: &impl World, family: Option<&str>) -> Result<(), ExportError> {
+    let Some(family) = family else { return Ok(()) };
+    let readable = world.book().families().any(|(name, _)| {
+        name.eq_ignore_ascii_case(family)
+            && world
+                .book()
+                .select_family(name)
+                .any(|id| world.font(id).is_some())
+    });
+    if readable {
+        Ok(())
+    } else {
+        Err(ExportError::new(
+            "font-unavailable",
+            "The selected slide font is not installed or readable. Choose another system font.",
+        ))
+    }
+}
+
+#[cfg(test)]
 fn compile_pdf(source: String, assets: &LoadedAssets) -> Result<Vec<u8>, ExportError> {
-    let document = compile_document(source, assets)?;
+    compile_pdf_with_font(source, assets, None)
+}
+
+fn compile_pdf_with_font(
+    source: String,
+    assets: &LoadedAssets,
+    selected_family: Option<&str>,
+) -> Result<Vec<u8>, ExportError> {
+    let document = compile_document_with_font(source, assets, selected_family)?;
     typst_pdf::pdf(&document, &PdfOptions::default())
         .map_err(|err| ExportError::new("pdf-export-failed", format!("PDF export failed: {err:?}")))
 }
@@ -719,6 +753,39 @@ mod tests {
         assert!(source.contains("Conference footer"));
         assert!(source.contains("42"));
         assert!(compile_pdf(source, &assets).unwrap().starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn validates_selected_fonts_using_the_compilers_font_book() {
+        let engine = TypstEngine::builder()
+            .main_file("#page[]")
+            .search_fonts_with(TypstKitFontOptions::new().include_system_fonts(true))
+            .build();
+        engine
+            .with_world(|world| {
+                let family = world
+                    .book()
+                    .families()
+                    .find_map(|(name, _)| {
+                        world
+                            .book()
+                            .select_family(name)
+                            .any(|id| world.font(id).is_some())
+                            .then(|| name.to_owned())
+                    })
+                    .expect("PDF tests require at least one readable system font");
+                assert!(validate_selected_font(world, Some(&family.to_uppercase())).is_ok());
+                assert!(validate_selected_font(world, None).is_ok());
+                assert_eq!(
+                    validate_selected_font(world, Some("Slides Missing 7d6f8c"))
+                        .unwrap_err()
+                        .code,
+                    "font-unavailable"
+                );
+            })
+            .unwrap();
+        let document: PagedDocument = engine.compile().output.unwrap();
+        assert_eq!(document.pages().len(), 1);
     }
 
     #[test]

@@ -47,3 +47,7 @@ Monaco 원문 → parseSlideDeck → SlideDeck (SafeBlock + 슬라이드별 데�
 - PDF는 시스템 폰트만 검색한다. 폰트 선택은 `:slide-font:`에 저장되며 세 출력기에 전달된다. Noto·Typst 폰트 번들은 사용하지 않는다. KaTeX 전용 웹폰트와 외부 라이브러리 고지는 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md), [폰트 고지](./src-tauri/assets/fonts/THIRD_PARTY_NOTICES.md)를 참고하고 실제 배포 산출물 기준으로 확인한다.
 
 Vault·Book Project·SQLite 검색·HTML/EPUB 출판·iOS는 이 문서의 지원 기능이 아니다.
+
+PDF 내보내기는 요청마다 Typst 엔진을 만들 때 시스템 폰트를 한 번 검색한다. 선택 폰트의 존재·읽기 가능 여부는 그 엔진의 FontBook/폰트 로더로 검사하고 같은 엔진으로 컴파일한다. 프로세스 전역 폰트 캐시는 두지 않아 다음 내보내기에 설치·삭제 변경이 반영된다.
+
+이미지 캐시는 `imageStore`가 소유하며 문서 전환·포커스 복귀·새로고침·출력 시 무효화하고 구독자에게 알린다. Mermaid 캐시는 소스와 명암 테마를 키로 최대 200개 결과를 보관하며 오래된 항목을 제거한다. 실패 결과는 제거하여 같은 소스를 재시도할 수 있다. 두 모듈 모두 내부 Map을 노출하지 않는다.

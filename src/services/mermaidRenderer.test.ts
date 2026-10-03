@@ -22,3 +22,14 @@ it('handles initialization failure and continues processing later diagrams', asy
   mermaid.render.mockResolvedValueOnce({ svg: '<svg><text>next</text></svg>' });
   expect(await renderMermaidSvg('next diagram', slideThemeById('light'))).toContain('next');
 });
+
+it('retries a failed source and shares successful cached renders', async () => {
+  const theme = slideThemeById('light');
+  mermaid.render.mockRejectedValueOnce(new Error('temporary failure'));
+  expect(await renderMermaidSvg('retry same source', theme)).toBeNull();
+  mermaid.render.mockResolvedValueOnce({ svg: '<svg><text>recovered</text></svg>' });
+  const retry = renderMermaidSvg('retry same source', theme);
+  expect(renderMermaidSvg('retry same source', theme)).toBe(retry);
+  expect(await retry).toContain('recovered');
+  expect(renderMermaidSvg('retry same source', theme)).toBe(retry);
+});

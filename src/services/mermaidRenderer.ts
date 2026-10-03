@@ -48,7 +48,13 @@ export function renderMermaidSvg(code: string, theme: SlideTheme): Promise<strin
   const key = `${dark ? 'dark' : 'light'}\u0000${code}`;
   let pending = cache.get(key);
   if (!pending) {
-    pending = queue.then(() => render(code, dark));
+    pending = queue
+      .then(() => render(code, dark))
+      .then((svg) => {
+        // Failed renders must be retryable; an older task must not evict a newer entry.
+        if (svg === null && cache.get(key) === pending) cache.delete(key);
+        return svg;
+      });
     queue = pending.catch(() => null);
     cache.set(key, pending);
     if (cache.size > 200) cache.delete(cache.keys().next().value as string);

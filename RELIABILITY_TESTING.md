@@ -51,6 +51,8 @@ Pages의 `test:publication`, `release:macos:verify`는 이 저장소에 없다. 
 
 ## 4. 검증 결과를 과장하지 않는다
 
+`validates_selected_fonts_using_the_compilers_font_book`는 같은 Typst 엔진의 검색 결과로 대소문자 무시·선택 생략·없는 폰트 거부를 검사하고 컴파일한다. 내보내기별 중복 검색 제거는 테스트 전체의 성능 개선을 보장하지 않는다. 각 레이아웃 테스트의 독립 검색과 조판 작업은 남아 있으므로 실행 시간은 별도로 측정한다. `mermaidRenderer.test.ts`는 실패한 소스의 재시도와 성공 결과·진행 중 작업 공유를 검사한다.
+
 `closingSlide.test.ts`는 `[.closing]`의 본문·발표자 노트 보존, 기본 머리말·꼬리말·번호 숨김, 개별 재정의와 PPTX 텍스트·가운데 정렬을 검사한다. 네이티브 전체 레이아웃 컴파일 테스트에도 closing 장을 포함한다. 샘플 마지막 장의 실제 WebView·PDF·PowerPoint 배치와 긴 제목의 넘침은 별도 시각 검증 대상이다.
 
 머리말·꼬리말·번호 설정은 `slideChrome.test.ts`에서 표지 기본값, 전역/개별 재정의, 시작 번호와 PPTX 텍스트를 확인한다. `compiles_background_and_highlighted_code`는 이 문구가 포함된 PDF 조판도 검사한다. 실제 미리보기·PPTX·PDF에서 긴 한글 문구, 배경 이미지 위 대비, 꼬리말과 번호의 겹침을 별도로 확인한다.
