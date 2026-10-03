@@ -32,6 +32,7 @@ import { SLIDE_THEMES, type SlideThemeId } from '../../services/slideThemes';
 interface AppHeaderProps {
   canCheckOutput: boolean;
   onCheckOutput: () => void;
+  onShowCheatSheet: () => void;
   fontFamily?: string;
   onFontFamilyChange: (font: string) => void;
   fileName: string;
@@ -198,6 +199,7 @@ export function AppHeader(props: AppHeaderProps) {
             <DropdownMenuItem onSelect={() => props.onVimModeChange(!vimMode)}>
               {vimMode ? '✓ ' : ''}Vim mode
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={props.onShowCheatSheet}>Cheat sheet…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

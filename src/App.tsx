@@ -3,6 +3,7 @@ import { Toaster, toast } from 'sonner';
 import { setApplicationTitle } from './services/windowAdapter';
 import { AppHeader } from './components/Layout/AppHeader';
 import { OutputQualityDialog } from './components/Layout/OutputQualityDialog';
+import { CheatSheetDialog } from './components/Layout/CheatSheetDialog';
 import { DeckPickerDialog } from './components/Layout/DeckPickerDialog';
 import { Presenter } from './components/Slides/Presenter';
 import { SlidePreview } from './components/Slides/SlidePreview';
@@ -57,6 +58,7 @@ export default function App() {
   const [insertRequest, setInsertRequest] = useState<InsertRequest | null>(null);
   const [presenting, setPresenting] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const exportBusy = useRef(false);
   const [folderDecks, setFolderDecks] = useState<string[]>([]);
@@ -168,6 +170,7 @@ export default function App() {
       <AppHeader
         canCheckOutput={!isStale}
         onCheckOutput={() => setQualityOpen(true)}
+        onShowCheatSheet={() => setCheatSheetOpen(true)}
         fontFamily={deck?.fontFamily}
         onFontFamilyChange={(font) => setHeaderAttribute('slide-font', font)}
         fileName={fileName}
@@ -195,6 +198,7 @@ export default function App() {
         onVimModeChange={(vimMode) => updatePreferences({ vimMode })}
       />
       <div ref={workspaceRef} className="app-workspace">
+        <CheatSheetDialog open={cheatSheetOpen} onOpenChange={setCheatSheetOpen} />
         <OutputQualityDialog
           open={qualityOpen}
           onOpenChange={setQualityOpen}
